@@ -18,6 +18,11 @@ dependencies:
   connectivity_plus: ^5.0.2
   google_fonts: ^6.2.1
   logger: ^2.0.2+1
+  flutter_map: ^7.0.2
+  flutter_map_cancellable_tile_provider: ^3.0.0
+  latlong2: ^0.9.1
+  geolocator: ^11.0.0
+  web_socket_channel: ^2.4.5
 
 dev_dependencies:
   flutter_test:

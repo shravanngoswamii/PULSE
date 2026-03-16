@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../data/models/intersection.dart';
 import '../../data/repositories/intersection_repository.dart';
 
@@ -108,9 +107,9 @@ class IntelligenceController extends StateNotifier<IntelligenceState> {
           ),
           intersections: [],
           selectedDistrict: const DistrictData(
-            sectorName: "Sector 4",
-            centerLat: 18.5204,
-            centerLng: 73.8567,
+            sectorName: "Vijay Nagar",
+            centerLat: 22.7196,
+            centerLng: 75.8577,
             congestionPercent: 0.72,
           ),
           safetyAudit: const WeeklySafetyAudit(
@@ -136,13 +135,12 @@ class IntelligenceController extends StateNotifier<IntelligenceState> {
   }
 
   void selectDistrict(String sectorName) {
-    // Mock district switching
-    if (sectorName == "Sector 4") {
+    if (sectorName == "Vijay Nagar") {
       state = state.copyWith(
         selectedDistrict: const DistrictData(
-          sectorName: "Sector 4",
-          centerLat: 18.5204,
-          centerLng: 73.8567,
+          sectorName: "Vijay Nagar",
+          centerLat: 22.7196,
+          centerLng: 75.8577,
           congestionPercent: 0.72,
         ),
       );

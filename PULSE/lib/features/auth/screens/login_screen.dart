@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulse_ev/config/app_theme.dart';
-import 'package:pulse_ev/core/utils/validators.dart';
 import 'package:pulse_ev/features/auth/providers/auth_provider.dart';
 import 'package:pulse_ev/shared/widgets/app_button.dart';
 import 'package:pulse_ev/shared/widgets/app_textfield.dart';
 import 'package:pulse_ev/shared/widgets/section_card.dart';
-import 'package:pulse_ev/shared/widgets/error_view.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -18,25 +16,44 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _identifierController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _rememberMe = false;
+  final _emailController = TextEditingController(text: 'driver@pulse.com');
+  final _passwordController = TextEditingController(text: 'password123');
+  String? _errorMessage;
 
   @override
   void dispose() {
-    _identifierController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _onLoginSucceed() {
-    context.go('/dashboard');
+  Future<void> _handleLogin() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _errorMessage = null);
+
+    try {
+      await ref.read(authProvider.notifier).login(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
+      if (!mounted) return;
+      if (ref.read(authProvider) == AuthState.authenticated) {
+        context.go('/dashboard');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().contains('Invalid credentials')
+            ? 'Invalid email or password'
+            : 'Connection failed. Is the backend running?';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final authNotifier = ref.read(authProvider.notifier);
 
     return Scaffold(
       body: SafeArea(
@@ -47,20 +64,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             children: [
               // Logo
               Container(
-                width: 60,
-                height: 60,
-                decoration: const BoxDecoration(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
                   color: AppColors.primary,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: const Center(
                   child: Text(
                     'P',
-                    style: TextStyle(
-                      fontSize: 32,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 34, color: Colors.white, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -70,13 +90,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 style: AppTextStyles.sectionTitle.copyWith(letterSpacing: 2),
               ),
               Text(
-                'SMART EMERGENCY TRAFFIC SYSTEM',
+                'EMERGENCY VEHICLE SYSTEM',
                 style: AppTextStyles.micro.copyWith(letterSpacing: 1),
               ),
               const SizedBox(height: 40),
-              
-              if (authState == AuthState.error) ...[
-                ErrorView(message: authNotifier.errorMessage ?? 'Authentication failed'),
+
+              if (_errorMessage != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.emergency.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.emergency.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: AppTextStyles.label.copyWith(color: AppColors.emergency),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
                 const SizedBox(height: 16),
               ],
 
@@ -86,109 +119,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     children: [
                       AppTextField(
-                        controller: _identifierController,
-                        label: 'Vehicle ID or Email',
-                        hintText: 'Enter your ID or email',
-                        prefixIcon: Icons.badge_outlined,
-                        validator: (v) => v?.contains('@') == true ? Validators.email(v) : Validators.vehicleId(v),
+                        controller: _emailController,
+                        label: 'Email',
+                        hintText: 'driver@pulse.com',
+                        prefixIcon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
+                        validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                       ),
                       const SizedBox(height: 20),
                       AppTextField(
                         controller: _passwordController,
                         label: 'Password',
-                        hintText: '........',
+                        hintText: 'Enter password',
                         prefixIcon: Icons.lock_outline_rounded,
                         isPassword: true,
-                        validator: Validators.password,
+                        validator: (v) => (v == null || v.length < 4) ? 'Min 4 characters' : null,
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                              activeColor: AppColors.primary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Remember this device',
-                            style: AppTextStyles.micro.copyWith(fontSize: 11),
-                          ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () {},
-                            child: Text(
-                              'FORGOT PASSWORD?',
-                              style: AppTextStyles.micro.copyWith(
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 28),
                       AppButton(
                         text: 'LOGIN',
                         isLoading: authState == AuthState.loading,
-                        onPressed: () async {
-                          if (_formKey.currentState?.validate() ?? false) {
-                            await authNotifier.login(
-                              _identifierController.text,
-                              _passwordController.text,
-                            );
-                            if (ref.read(authProvider) == AuthState.authenticated) {
-                              _onLoginSucceed();
-                            }
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 48,
-                        child: OutlinedButton(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.border),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.g_mobiledata, color: AppColors.textPrimary, size: 32),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Log in with Google',
-                                style: AppTextStyles.label.copyWith(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        onPressed: _handleLogin,
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    "Don't have an account? ",
-                    style: AppTextStyles.label,
-                  ),
+                  Text("Don't have an account? ", style: AppTextStyles.label),
                   GestureDetector(
                     onTap: () => context.go('/signup'),
                     child: Text(
@@ -202,16 +163,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.verified_user_outlined, size: 14, color: AppColors.textSecondary),
-                  const SizedBox(width: 4),
-                  Text(
-                    'V1.0.4 | SECURE EMERGENCY NETWORK',
-                    style: AppTextStyles.micro.copyWith(letterSpacing: 0.5),
-                  ),
-                ],
+              Text(
+                'V2.0 | SECURE EMERGENCY NETWORK',
+                style: AppTextStyles.micro.copyWith(letterSpacing: 0.5),
               ),
             ],
           ),

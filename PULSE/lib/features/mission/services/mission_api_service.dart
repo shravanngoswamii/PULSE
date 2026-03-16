@@ -1,49 +1,65 @@
+import 'package:pulse_ev/core/network/api_client.dart';
 import 'package:pulse_ev/features/mission/models/hospital_model.dart';
-import 'package:pulse_ev/features/mission/models/mission_model.dart';
 
 class MissionApiService {
-  Future<List<HospitalModel>> getHospitals() async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return [
-      HospitalModel(
-        name: "City Hospital",
-        distance: 4.2,
-        eta: "7 min",
-        coordinates: [40.7128, -74.0060],
-        signalsToOverride: 5,
-      ),
-      HospitalModel(
-        name: "Trauma Center",
-        distance: 5.8,
-        eta: "10 min",
-        coordinates: [40.7200, -74.0100],
-        signalsToOverride: 8,
-      ),
-      HospitalModel(
-        name: "Emergency Center",
-        distance: 3.1,
-        eta: "5 min",
-        coordinates: [40.7050, -73.9950],
-        signalsToOverride: 4,
-      ),
-    ];
+  final ApiClient _apiClient;
+
+  MissionApiService(this._apiClient);
+
+  Future<List<HospitalModel>> getHospitals(double lat, double lng) async {
+    final response = await _apiClient.get(
+      '/driver/nearby-hospitals',
+      queryParameters: {'lat': lat, 'lng': lng},
+    );
+    final List data = response.data is List ? response.data : response.data['hospitals'] ?? [];
+    return data.map((json) => HospitalModel.fromJson(json as Map<String, dynamic>)).toList();
   }
 
-  Future<MissionModel> startMission(String type, String priority, HospitalModel hospital) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    return MissionModel(
-      missionId: "MSN_${DateTime.now().millisecondsSinceEpoch}",
-      incidentType: type,
-      priorityLevel: priority,
-      destinationHospital: hospital,
-      distance: hospital.distance,
-      eta: hospital.eta,
-      signalsCleared: 0,
-      status: MissionStatus.active,
+  Future<Map<String, dynamic>> startMission({
+    required String vehicleId,
+    required double destLat,
+    required double destLng,
+    required String destName,
+    required String incidentType,
+    required String priority,
+    required double originLat,
+    required double originLng,
+  }) async {
+    final response = await _apiClient.post(
+      '/driver/mission/start',
+      data: {
+        'vehicle_id': vehicleId,
+        'destination_lat': destLat,
+        'destination_lng': destLng,
+        'destination_name': destName,
+        'incident_type': incidentType,
+        'priority': priority,
+        'origin_lat': originLat,
+        'origin_lng': originLng,
+      },
     );
+    return response.data as Map<String, dynamic>;
   }
 
   Future<void> endMission(String missionId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await _apiClient.post(
+      '/driver/mission/end',
+      data: {'mission_id': missionId},
+    );
+  }
+
+  Future<Map<String, dynamic>> pingGPS(String missionId, double lat, double lng) async {
+    final response = await _apiClient.post(
+      '/driver/mission/ping',
+      data: {
+        'mission_id': missionId,
+        'current_lat': lat,
+        'current_lng': lng,
+      },
+    );
+    if (response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    return {};
   }
 }

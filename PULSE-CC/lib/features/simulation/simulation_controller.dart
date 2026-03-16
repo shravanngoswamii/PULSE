@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 import '../../data/models/traffic_alert.dart';
 import '../../data/models/emergency_vehicle.dart';
 
@@ -104,11 +104,13 @@ class SimulationController extends StateNotifier<SimulationState> {
   Timer? _timer;
 
   static final List<LatLng> _waypoints = [
-    const LatLng(18.5120, 73.8456), // Start (Central Station)
-    const LatLng(18.5160, 73.8490), // MG Road approach
-    const LatLng(18.5190, 73.8520), // MG Road junction
-    const LatLng(18.5230, 73.8567), // C. Square junction
-    const LatLng(18.5290, 73.8610), // City Hospital
+    const LatLng(22.7134, 75.8621), // Sarwate
+    const LatLng(22.7185, 75.8571), // Rajwada
+    const LatLng(22.7196, 75.8577), // Geeta Bhawan
+    const LatLng(22.7299, 75.8656), // Bhanwar Kuwa
+    const LatLng(22.7271, 75.8835), // MG Road
+    const LatLng(22.7236, 75.8798), // Palasia
+    const LatLng(22.7515, 75.8770), // Bombay Hospital
   ];
 
   SimulationController()
@@ -193,7 +195,7 @@ class SimulationController extends StateNotifier<SimulationState> {
 
   void _processTick(int t) {
     switch (t) {
-      case 1: // Adjusting t=0 to t=1 for technical reasons or keep it 0 in start
+      case 1:
         _addEvent("Ambulance AMB-04 dispatched", SimEventType.dispatch);
         state = state.copyWith(ambulancePosition: _waypoints[0]);
         break;

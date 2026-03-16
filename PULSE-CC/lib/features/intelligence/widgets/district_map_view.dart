@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../intelligence_controller.dart';
@@ -21,24 +22,28 @@ class DistrictMapView extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: Stack(
           children: [
-            GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: LatLng(district.centerLat, district.centerLng),
-                zoom: 12.0,
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: LatLng(district.centerLat, district.centerLng),
+                initialZoom: 12.0,
               ),
-              mapType: MapType.normal,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              circles: {
-                Circle(
-                  circleId: const CircleId('congestion_zone'),
-                  center: LatLng(district.centerLat, district.centerLng),
-                  radius: 3000,
-                  fillColor: AppColors.amber.withOpacity(0.35),
-                  strokeColor: AppColors.amber,
-                  strokeWidth: 2,
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.pulse.ta',
                 ),
-              },
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: LatLng(district.centerLat, district.centerLng),
+                      radius: 80,
+                      color: AppColors.amber.withOpacity(0.35),
+                      borderColor: AppColors.amber,
+                      borderStrokeWidth: 2,
+                    ),
+                  ],
+                ),
+              ],
             ),
             Positioned(
               top: 10,

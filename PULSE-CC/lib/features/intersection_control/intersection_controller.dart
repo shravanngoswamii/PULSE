@@ -5,8 +5,6 @@ import '../../data/models/emergency_vehicle.dart';
 import '../../data/models/active_mission.dart';
 import '../../data/repositories/intersection_repository.dart';
 import '../../data/repositories/mission_repository.dart';
-// import '../../data/repositories/mock_intersection_repository.dart';
-// import '../../data/repositories/mock_mission_repository.dart';
 
 class IntersectionControlState {
   final Intersection? intersection;
@@ -48,7 +46,8 @@ class IntersectionControlState {
   }
 }
 
-class IntersectionController extends StateNotifier<IntersectionControlState> {
+class IntersectionController
+    extends StateNotifier<IntersectionControlState> {
   final IntersectionRepository _intersectionRepo;
   final MissionRepository _missionRepo;
   final String intersectionId;
@@ -66,18 +65,21 @@ class IntersectionController extends StateNotifier<IntersectionControlState> {
   Future<void> initialize() async {
     state = state.copyWith(isLoading: true);
     try {
-      final intersection = await _intersectionRepo.getIntersectionById(intersectionId);
+      final intersection =
+          await _intersectionRepo.getIntersectionById(intersectionId);
       final activeMissions = await _missionRepo.getActiveMissions();
-      
-      // Check if any active mission routes through this intersection
-      // For mock purposes, we'll check if the intersectionId is in any mission's route or if we should simulate it
-      final hasEmergency = activeMissions.any((m) => 
-        m.status == MissionStatus.active // Changed from enRoute
-      );
-      
-      final ambulance = activeMissions.where((m) => m.vehicle.type == VehicleType.ambulance).isEmpty
+
+      final hasEmergency =
+          activeMissions.any((m) => m.status == MissionStatus.active);
+
+      final ambulance = activeMissions
+              .where((m) => m.vehicle.type == VehicleType.ambulance)
+              .isEmpty
           ? null
-          : activeMissions.where((m) => m.vehicle.type == VehicleType.ambulance).first.vehicle;
+          : activeMissions
+              .where((m) => m.vehicle.type == VehicleType.ambulance)
+              .first
+              .vehicle;
 
       state = state.copyWith(
         intersection: intersection,
@@ -97,20 +99,52 @@ class IntersectionController extends StateNotifier<IntersectionControlState> {
     state = state.copyWith(selectedLane: lane);
   }
 
-  void forceGreen() {
-    _showSuccess('Signal forced to GREEN for ${state.selectedLane} lane');
+  Future<void> forceGreen() async {
+    try {
+      await _intersectionRepo.forceSignal(intersectionId, SignalPhase.green);
+      _showSuccess('Signal forced to GREEN for ${state.selectedLane} lane');
+      // Refresh intersection data
+      final updated =
+          await _intersectionRepo.getIntersectionById(intersectionId);
+      if (updated != null) {
+        state = state.copyWith(intersection: updated);
+      }
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to force green signal');
+    }
   }
 
-  void forceRed() {
-    _showSuccess('Signal forced to RED for ${state.selectedLane} lane');
+  Future<void> forceRed() async {
+    try {
+      await _intersectionRepo.forceSignal(intersectionId, SignalPhase.red);
+      _showSuccess('Signal forced to RED for ${state.selectedLane} lane');
+      final updated =
+          await _intersectionRepo.getIntersectionById(intersectionId);
+      if (updated != null) {
+        state = state.copyWith(intersection: updated);
+      }
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to force red signal');
+    }
   }
 
-  void restoreAutomatic() {
-    _showSuccess('Automatic control restored');
+  Future<void> restoreAutomatic() async {
+    try {
+      await _intersectionRepo.restoreAutomatic(intersectionId);
+      _showSuccess('Automatic control restored');
+      final updated =
+          await _intersectionRepo.getIntersectionById(intersectionId);
+      if (updated != null) {
+        state = state.copyWith(intersection: updated);
+      }
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to restore auto control');
+    }
   }
 
   void activateGreenCorridor() {
-    _showSuccess('GREEN CORRIDOR activated for ${state.approachingVehicle?.id ?? "Emergency Vehicle"}');
+    _showSuccess(
+        'GREEN CORRIDOR activated for ${state.approachingVehicle?.id ?? "Emergency Vehicle"}');
   }
 
   void _showSuccess(String message) {
@@ -123,7 +157,8 @@ class IntersectionController extends StateNotifier<IntersectionControlState> {
   }
 }
 
-final intersectionControllerProvider = StateNotifierProvider.family<IntersectionController, IntersectionControlState, String>((ref, id) {
+final intersectionControllerProvider = StateNotifierProvider.family<
+    IntersectionController, IntersectionControlState, String>((ref, id) {
   final intersectionRepo = ref.watch(intersectionRepositoryProvider);
   final missionRepo = ref.watch(missionRepositoryProvider);
   return IntersectionController(

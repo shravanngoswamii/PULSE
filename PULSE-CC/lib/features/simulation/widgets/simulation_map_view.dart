@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../shared/widgets/pulse_card.dart';
@@ -24,16 +25,14 @@ class SimulationMapView extends StatefulWidget {
 }
 
 class _SimulationMapViewState extends State<SimulationMapView> {
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
 
   @override
   void didUpdateWidget(SimulationMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.ambulancePosition != oldWidget.ambulancePosition &&
         widget.ambulancePosition != null) {
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(widget.ambulancePosition!),
-      );
+      _mapController.move(widget.ambulancePosition!, _mapController.camera.zoom);
     }
   }
 
@@ -51,38 +50,62 @@ class _SimulationMapViewState extends State<SimulationMapView> {
           borderRadius: BorderRadius.circular(14),
           child: Stack(
             children: [
-              GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: widget.corridorWaypoints[0],
-                  zoom: 13.0,
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: widget.corridorWaypoints[0],
+                  initialZoom: 13.0,
                 ),
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                onMapCreated: (controller) => _mapController = controller,
-                polylines: widget.status != SimulationStatus.idle
-                    ? {
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.pulse.ta',
+                  ),
+                  if (widget.status != SimulationStatus.idle)
+                    PolylineLayer(
+                      polylines: [
                         Polyline(
-                          polylineId: const PolylineId('corridor'),
                           points: widget.corridorWaypoints,
                           color: AppColors.signalGreen,
-                          width: 4,
+                          strokeWidth: 4,
                         ),
-                      }
-                    : {},
-                markers: {
-                  if (widget.ambulancePosition != null)
-                    Marker(
-                      markerId: const MarkerId('ambulance'),
-                      position: widget.ambulancePosition!,
-                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                      ],
                     ),
-                  if (widget.activeIncidentLocation != null)
-                    Marker(
-                      markerId: const MarkerId('incident'),
-                      position: const LatLng(18.5190, 73.8520), // Mock fixed position for incident
-                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-                    ),
-                },
+                  MarkerLayer(
+                    markers: [
+                      if (widget.ambulancePosition != null)
+                        Marker(
+                          point: widget.ambulancePosition!,
+                          width: 36,
+                          height: 36,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                            ),
+                            child: const Icon(Icons.local_hospital, color: Colors.white, size: 18),
+                          ),
+                        ),
+                      if (widget.activeIncidentLocation != null)
+                        Marker(
+                          point: const LatLng(22.7196, 75.8577),
+                          width: 36,
+                          height: 36,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.orange,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                            ),
+                            child: const Icon(Icons.warning, color: Colors.white, size: 18),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
               Positioned(
                 bottom: 10,

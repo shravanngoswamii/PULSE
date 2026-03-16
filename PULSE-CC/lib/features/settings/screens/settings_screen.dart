@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../shared/widgets/pulse_app_bar.dart';
 import '../../../shared/widgets/pulse_card.dart';
+import '../../../features/auth/auth_controller.dart';
+import '../../../data/sources/local/secure_storage.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final storage = ref.watch(secureStorageProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const PulseAppBar(
         title: 'SETTINGS',
-        subtitle: 'System Configuration',
+        subtitle: 'Operator Profile',
         showSettings: false,
       ),
       body: SingleChildScrollView(
@@ -23,7 +28,7 @@ class SettingsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'GENERAL',
+              'PROFILE',
               style: AppTypography.micro.copyWith(
                 color: AppColors.textSecondary,
                 letterSpacing: 1.0,
@@ -31,26 +36,28 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             PulseCard(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                children: [
-                  _SettingsTile(
-                    icon: Icons.notifications_none,
-                    title: 'Active Alerts Feed',
-                    subtitle: 'View and manage current traffic alerts',
-                    onTap: () => context.go('/emergencies/alerts'),
-                  ),
-                  const Divider(indent: 52, color: AppColors.border),
-                  _SettingsTile(
-                    icon: Icons.language,
-                    title: 'Language',
-                    subtitle: 'English (US)',
-                    onTap: () {},
-                  ),
-                ],
+              padding: const EdgeInsets.all(16),
+              child: FutureBuilder<Map<String, String?>>(
+                future: _loadProfile(storage),
+                builder: (context, snapshot) {
+                  final data = snapshot.data;
+                  final officerId = data?['officer_id'] ?? '---';
+                  final role = data?['user_role'] ?? '---';
+                  final name = data?['user_name'] ?? '---';
+
+                  return Column(
+                    children: [
+                      _ProfileRow(label: 'NAME', value: name),
+                      const Divider(height: 24, color: AppColors.border),
+                      _ProfileRow(label: 'EMAIL / ID', value: officerId),
+                      const Divider(height: 24, color: AppColors.border),
+                      _ProfileRow(label: 'ROLE', value: role),
+                    ],
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Text(
               'ACCOUNT',
               style: AppTypography.micro.copyWith(
@@ -59,25 +66,30 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            PulseCard(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                children: [
-                  _SettingsTile(
-                    icon: Icons.person_outline,
-                    title: 'Profile Settings',
-                    subtitle: 'Manage your authority profile',
-                    onTap: () {},
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).logout();
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                },
+                icon: const Icon(Icons.logout, size: 20),
+                label: Text(
+                  'LOGOUT',
+                  style: AppTypography.labelLarge.copyWith(
+                    color: Colors.white,
+                    letterSpacing: 1.0,
                   ),
-                  const Divider(indent: 52, color: AppColors.border),
-                  _SettingsTile(
-                    icon: Icons.logout,
-                    title: 'Logout',
-                    onTap: () => context.go('/login'),
-                    textColor: AppColors.danger,
-                    iconColor: AppColors.danger,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ],
+                ),
               ),
             ),
           ],
@@ -85,51 +97,42 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<Map<String, String?>> _loadProfile(SecureStorage storage) async {
+    final officerId = await storage.getOfficerId();
+    final role = await storage.read('user_role');
+    final name = await storage.read('user_name');
+    return {
+      'officer_id': officerId,
+      'user_role': role,
+      'user_name': name,
+    };
+  }
 }
 
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final VoidCallback onTap;
-  final Color? textColor;
-  final Color? iconColor;
+class _ProfileRow extends StatelessWidget {
+  final String label;
+  final String value;
 
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    required this.onTap,
-    this.textColor,
-    this.iconColor,
-  });
+  const _ProfileRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: (iconColor ?? AppColors.textPrimary).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: AppTypography.micro.copyWith(color: AppColors.textSecondary),
         ),
-        child: Icon(icon, color: iconColor ?? AppColors.textPrimary, size: 20),
-      ),
-      title: Text(
-        title,
-        style: AppTypography.bodyMedium.copyWith(
-          color: textColor ?? AppColors.textPrimary,
-          fontWeight: FontWeight.w600,
+        Text(
+          value,
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle!,
-              style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
-            )
-          : null,
-      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.border),
-      onTap: onTap,
+      ],
     );
   }
 }

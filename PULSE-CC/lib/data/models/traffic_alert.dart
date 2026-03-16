@@ -28,8 +28,8 @@ class TrafficAlert extends Equatable {
     required this.timestamp,
     required this.isActive,
     this.description,
-    this.lat = 18.5204,
-    this.lng = 73.8567,
+    this.lat = 22.7196,
+    this.lng = 75.8577,
   });
 
   factory TrafficAlert.fromJson(Map<String, dynamic> json) {
@@ -44,8 +44,8 @@ class TrafficAlert extends Equatable {
       timestamp: DateTime.parse(json['timestamp'] as String),
       isActive: json['isActive'] as bool,
       description: json['description'] as String?,
-      lat: (json['lat'] as num?)?.toDouble() ?? 18.5204,
-      lng: (json['lng'] as num?)?.toDouble() ?? 73.8567,
+      lat: (json['lat'] as num?)?.toDouble() ?? 22.7196,
+      lng: (json['lng'] as num?)?.toDouble() ?? 75.8577,
     );
   }
 

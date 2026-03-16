@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PULSE - Route Algorithm Visualizer</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',-apple-system,sans-serif;background:#0F172A;color:#E2E8F0;display:flex;height:100vh;overflow:hidden}
+#map{flex:1;z-index:1}
+.sb{width:460px;display:flex;flex-direction:column;background:#0F172A;border-left:1px solid #1E293B;z-index:2}
+.sb-hdr{padding:14px 18px;border-bottom:1px solid #1E293B;display:flex;align-items:center;gap:10px}
+.sb-hdr .logo{width:32px;height:32px;background:#10B981;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff}
+.sb-hdr h1{font-size:14px;font-weight:700;color:#10B981}
+.sb-hdr p{font-size:10px;color:#64748B}
+.tabs{display:flex;border-bottom:1px solid #1E293B}
+.tab{flex:1;padding:9px;text-align:center;font-size:11px;font-weight:600;cursor:pointer;color:#64748B;border-bottom:2px solid transparent;transition:.2s}
+.tab.active{color:#10B981;border-color:#10B981;background:rgba(16,185,129,.04)}
+.tab:hover{color:#CBD5E1}
+.sb-body{flex:1;overflow-y:auto;padding:14px}
+.panel{display:none}.panel.active{display:block}
+/* Cards */
+.mc{background:#1E293B;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:.2s;position:relative}
+.mc:hover{border-color:#475569}
+.mc.active{border-color:#10B981;box-shadow:0 0 16px rgba(16,185,129,.12)}
+.mc .row{display:flex;justify-content:space-between;align-items:center}
+.mc .id{font-family:monospace;font-size:11px;color:#10B981;font-weight:700}
+.mc .badge{font-size:9px;padding:2px 7px;border-radius:8px;font-weight:700;text-transform:uppercase}
+.badge-critical{background:#EF4444;color:#fff}.badge-high{background:#F59E0B;color:#0F172A}.badge-standard{background:#475569;color:#CBD5E1}
+.mc .info{font-size:11px;color:#94A3B8;margin-top:4px}
+.mc .stats-row{display:flex;gap:12px;margin-top:6px;font-size:10px;color:#64748B}
+.mc .stats-row span{color:#CBD5E1;font-weight:600}
+.mc .replay-btn{position:absolute;top:10px;right:10px;background:#334155;border:none;color:#CBD5E1;font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;font-weight:600}
+.mc .replay-btn:hover{background:#10B981;color:#fff}
+.no-m{text-align:center;padding:50px 20px;color:#475569}
+.no-m .ic{font-size:48px;margin-bottom:10px;color:#334155}
+.no-m p{font-size:12px}
+.no-m small{color:#334155}
+.live-dot{width:7px;height:7px;background:#10B981;border-radius:50%;display:inline-block;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* Math panel */
+.math{background:#1E293B;border:1px solid #334155;border-radius:8px;margin-top:10px;overflow:hidden}
+.math-hdr{padding:8px 12px;background:#1a2332;font-size:11px;font-weight:600;color:#94A3B8;border-bottom:1px solid #334155;display:flex;justify-content:space-between}
+.math-body{max-height:350px;overflow-y:auto;padding:8px}
+.math-step{padding:5px 8px;border-bottom:1px solid rgba(51,65,85,.4);font-size:11px;font-family:'Consolas','Courier New',monospace;line-height:1.5}
+.math-step:last-child{border:none}
+.math-step .s{color:#10B981;font-weight:700;margin-right:6px}
+.math-step .h{color:#F59E0B;font-weight:600}
+.math-step .b{color:#3B82F6}
+.math-step .r{color:#EF4444}
+.math-step .f{color:#818CF8}
+.math-step .dim{color:#475569}
+/* Manual mode */
+.search-box{position:relative;margin-bottom:10px}
+.search-box input{width:100%;padding:9px 12px 9px 34px;background:#1E293B;border:1px solid #334155;border-radius:8px;color:#E2E8F0;font-size:13px;font-family:inherit;outline:none}
+.search-box input:focus{border-color:#10B981}
+.search-box .icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#64748B;font-size:14px}
+.search-results{position:absolute;top:100%;left:0;right:0;background:#1E293B;border:1px solid #334155;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;z-index:10;display:none}
+.search-results.show{display:block}
+.sr-item{padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #2a3344}
+.sr-item:hover{background:#334155}
+.sr-item small{color:#64748B;display:block}
+.ctrl-row{display:flex;gap:8px;margin-bottom:10px}
+.ctrl-row button{flex:1;padding:9px;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:inherit}
+.btn-go{background:#10B981;color:#fff}.btn-go:hover{background:#059669}
+.btn-rst{background:#334155;color:#CBD5E1}.btn-rst:hover{background:#475569}
+.btn-go:disabled{opacity:.3;cursor:not-allowed}
+.spd{display:flex;align-items:center;gap:6px;font-size:11px;color:#64748B;margin-bottom:12px}
+.spd input{flex:1}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0;font-size:10px;color:#94A3B8}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle}
+.sts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
+.st{background:#1E293B;border-radius:7px;padding:8px 10px;border:1px solid #334155}
+.st .l{font-size:9px;color:#64748B;text-transform:uppercase;letter-spacing:.4px}
+.st .v{font-size:16px;font-weight:700;margin-top:1px}
+.st .v.g{color:#10B981}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="sb">
+  <div class="sb-hdr">
+    <div class="logo">P</div>
+    <div><h1>PULSE Route Visualizer</h1><p>A* Algorithm with Haversine Heuristic</p></div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('live')"><span class="live-dot"></span>&nbsp;Live Missions</div>
+    <div class="tab" onclick="switchTab('manual')">Manual Test</div>
+  </div>
+  <div class="sb-body">
+    <!-- LIVE -->
+    <div id="p-live" class="panel active">
+      <div id="mList"><div class="no-m"><div class="ic">&#128752;</div><p>Waiting for live missions...</p><small>Start a mission from the PULSE app</small></div></div>
+      <div id="livemath" class="math" style="display:none">
+        <div class="math-hdr"><span>Algorithm Steps</span><span id="mathAlgo">A*</span></div>
+        <div class="math-body" id="liveMathBody"></div>
+      </div>
+    </div>
+    <!-- MANUAL -->
+    <div id="p-manual" class="panel">
+      <p style="font-size:11px;color:#64748B;margin-bottom:8px">Click two points on the map or search locations</p>
+      <div class="search-box">
+        <span class="icon">&#128269;</span>
+        <input id="searchInput" placeholder="Search location in Indore..." oninput="debounceSearch()" onkeydown="if(event.key==='Enter')doSearch()" />
+        <div class="search-results" id="searchResults"></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;font-size:11px">
+        <div style="flex:1;padding:6px 8px;background:#1E293B;border-radius:6px;border:1px solid #334155">
+          <span style="color:#EF4444">A</span> <span id="originLabel" style="color:#94A3B8">Click map for origin</span>
+        </div>
+        <div style="flex:1;padding:6px 8px;background:#1E293B;border-radius:6px;border:1px solid #334155">
+          <span style="color:#3B82F6">B</span> <span id="destLabel" style="color:#94A3B8">Click map for destination</span>
+        </div>
+      </div>
+      <div class="ctrl-row">
+        <button class="btn-go" id="btnRun" onclick="runManual()" disabled>Run A* Algorithm</button>
+        <button class="btn-rst" onclick="resetManual()">Reset</button>
+      </div>
+      <div class="spd"><span>Speed:</span><input type="range" id="speed" min="30" max="800" value="200" oninput="document.getElementById('spdVal').textContent=this.value+'ms'" /><span id="spdVal">200ms</span></div>
+      <div class="legend">
+        <span><i style="background:#64748B"></i>Unvisited</span>
+        <span><i style="background:#F59E0B"></i>Exploring</span>
+        <span><i style="background:#3B82F6"></i>Visited</span>
+        <span><i style="background:#10B981"></i>Path</span>
+        <span><i style="background:#EF4444"></i>Start/End</span>
+      </div>
+      <div class="sts">
+        <div class="st"><div class="l">Nodes Visited</div><div class="v" id="sv">0</div></div>
+        <div class="st"><div class="l">Distance</div><div class="v g" id="sd">--</div></div>
+        <div class="st"><div class="l">ETA</div><div class="v g" id="se">--</div></div>
+        <div class="st"><div class="l">Path Nodes</div><div class="v" id="sp">--</div></div>
+      </div>
+      <div class="math">
+        <div class="math-hdr"><span>A* Calculation Steps</span><span>f(n) = g(n) + h(n)</span></div>
+        <div class="math-body" id="manualMath"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API=location.origin, WS_URL=API.replace('http','ws')+'/ws/visualizer';
+let map,gNodes={},gEdges=[],markers={},edgeLines=[],pathLine=null,vehMarkers={},ws=null;
+let manualOrigin=null,manualDest=null,manualOriginMarker=null,manualDestMarker=null,running=false;
+let searchTimer=null, placingMode='origin';
+
+map=L.map('map',{zoomControl:true}).setView([22.7196,75.8577],13);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'PULSE|OSM',maxZoom:18}).addTo(map);
+
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach((e,i)=>e.classList.toggle('active',t==='live'?i===0:i===1));
+  document.getElementById('p-live').classList.toggle('active',t==='live');
+  document.getElementById('p-manual').classList.toggle('active',t==='manual');
+}
+
+// Map click for manual mode
+map.on('click',function(e){
+  if(document.getElementById('p-manual').classList.contains('active')){
+    if(!manualOrigin){
+      manualOrigin={lat:e.latlng.lat,lng:e.latlng.lng};
+      if(manualOriginMarker)map.removeLayer(manualOriginMarker);
+      manualOriginMarker=L.circleMarker(e.latlng,{radius:10,fillColor:'#EF4444',color:'#fff',weight:2,fillOpacity:1}).addTo(map);
+      document.getElementById('originLabel').textContent=`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+      document.getElementById('originLabel').style.color='#E2E8F0';
+      reverseGeo(e.latlng.lat,e.latlng.lng).then(n=>{if(n)document.getElementById('originLabel').textContent=n;});
+    } else if(!manualDest){
+      manualDest={lat:e.latlng.lat,lng:e.latlng.lng};
+      if(manualDestMarker)map.removeLayer(manualDestMarker);
+      manualDestMarker=L.circleMarker(e.latlng,{radius:10,fillColor:'#3B82F6',color:'#fff',weight:2,fillOpacity:1}).addTo(map);
+      document.getElementById('destLabel').textContent=`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+      document.getElementById('destLabel').style.color='#E2E8F0';
+      reverseGeo(e.latlng.lat,e.latlng.lng).then(n=>{if(n)document.getElementById('destLabel').textContent=n;});
+      document.getElementById('btnRun').disabled=false;
+    }
+  }
+});
+
+// Search
+function debounceSearch(){clearTimeout(searchTimer);searchTimer=setTimeout(doSearch,400);}
+async function doSearch(){
+  const q=document.getElementById('searchInput').value.trim();
+  if(q.length<2)return;
+  const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' Indore')}&format=json&limit=6`,{headers:{'User-Agent':'PULSE-Viz'}});
+  const data=await res.json();
+  const el=document.getElementById('searchResults');
+  el.innerHTML='';
+  data.forEach(r=>{
+    const d=document.createElement('div');d.className='sr-item';
+    d.innerHTML=`${r.display_name.split(',').slice(0,3).join(', ')}<small>${parseFloat(r.lat).toFixed(4)}, ${parseFloat(r.lon).toFixed(4)}</small>`;
+    d.onclick=()=>{
+      el.classList.remove('show');document.getElementById('searchInput').value='';
+      const ll=L.latLng(parseFloat(r.lat),parseFloat(r.lon));
+      map.setView(ll,15);
+      if(!manualOrigin){
+        manualOrigin={lat:ll.lat,lng:ll.lng};
+        if(manualOriginMarker)map.removeLayer(manualOriginMarker);
+        manualOriginMarker=L.circleMarker(ll,{radius:10,fillColor:'#EF4444',color:'#fff',weight:2,fillOpacity:1}).addTo(map);
+        document.getElementById('originLabel').textContent=r.display_name.split(',').slice(0,2).join(', ');
+        document.getElementById('originLabel').style.color='#E2E8F0';
+      } else {
+        manualDest={lat:ll.lat,lng:ll.lng};
+        if(manualDestMarker)map.removeLayer(manualDestMarker);
+        manualDestMarker=L.circleMarker(ll,{radius:10,fillColor:'#3B82F6',color:'#fff',weight:2,fillOpacity:1}).addTo(map);
+        document.getElementById('destLabel').textContent=r.display_name.split(',').slice(0,2).join(', ');
+        document.getElementById('destLabel').style.color='#E2E8F0';
+        document.getElementById('btnRun').disabled=false;
+      }
+    };
+    el.appendChild(d);
+  });
+  if(data.length)el.classList.add('show');
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.search-box'))document.getElementById('searchResults').classList.remove('show');});
+
+async function reverseGeo(lat,lng){
+  try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,{headers:{'User-Agent':'PULSE-Viz'}});
+  const d=await r.json();return d.display_name?.split(',').slice(0,2).join(', ');}catch(e){return null;}
+}
+
+// Load graph
+async function loadGraph(){
+  try{const r=await fetch(API+'/api/visualizer/graph');const d=await r.json();gNodes=d.nodes;gEdges=d.edges;drawGraph();}catch(e){console.error(e);}
+}
+function drawGraph(){
+  const drawn=new Set();
+  Object.entries(gNodes).forEach(([id,n])=>{
+    const m=L.circleMarker([n.lat,n.lng],{radius:7,fillColor:'#475569',color:'#1E293B',weight:1.5,fillOpacity:.8}).addTo(map);
+    m.bindTooltip(`<b>${n.name}</b>`,{direction:'top',offset:[0,-6]});
+    markers[id]=m;
+  });
+  gEdges.forEach(e=>{
+    const k=[e.from_id,e.to_id].sort().join('-');if(drawn.has(k))return;drawn.add(k);
+    const f=gNodes[e.from_id],t=gNodes[e.to_id];if(!f||!t)return;
+    const l=L.polyline([[f.lat,f.lng],[t.lat,t.lng]],{color:'#2a3344',weight:1.5,opacity:.4,dashArray:'4,4'}).addTo(map);
+    l._e={from:e.from_id,to:e.to_id,w:e.weight};edgeLines.push(l);
+  });
+}
+
+// WebSocket
+function connectWS(){
+  ws=new WebSocket(WS_URL);
+  ws.onopen=()=>console.log('WS connected');
+  ws.onmessage=evt=>{const m=JSON.parse(evt.data);
+    if(m.event==='new_mission')handleNew(m);
+    else if(m.event==='vehicle_moved')handleMove(m);
+    else if(m.event==='mission_completed')handleDone(m);
+  };
+  ws.onclose=()=>setTimeout(connectWS,3000);
+}
+
+function handleNew(d){
+  const list=document.getElementById('mList');
+  const nm=list.querySelector('.no-m');if(nm)nm.remove();
+  const c=document.createElement('div');c.className='mc';c.id='mc-'+d.mission_id;
+  const bc=d.priority==='critical'?'badge-critical':d.priority==='high'?'badge-high':'badge-standard';
+  c.innerHTML=`<div class="row"><span class="id">${d.mission_id}</span><span class="badge ${bc}">${d.priority}</span></div>
+    <div class="info">${d.vehicle_type||''} ${d.vehicle_id} | ${d.driver_name||''}</div>
+    <div class="info">${d.incident_type||''} &rarr; ${d.destination?.name||'Unknown'}</div>
+    <div class="stats-row"><span>${d.distance_km||0} km</span> | <span>${d.eta_minutes||0} min</span> | <span>${d.intersection_path?.length||0} nodes</span></div>
+    <button class="replay-btn" onclick="event.stopPropagation();replayMission('${d.mission_id}')">Replay</button>`;
+  c.onclick=()=>vizMission(d);
+  list.prepend(c);
+  // Store for replay
+  c._data=d;
+  // Auto-play + pan to it
+  switchTab('live');
+  vizMission(d);
+}
+
+async function vizMission(d){
+  document.querySelectorAll('.mc').forEach(c=>c.classList.remove('active'));
+  const card=document.getElementById('mc-'+d.mission_id);if(card)card.classList.add('active');
+  resetMapViz();
+  const math=document.getElementById('livemath');math.style.display='block';
+  const body=document.getElementById('liveMathBody');body.innerHTML='';
+  const steps=d.algo_steps||[];
+
+  // Fit map to route area
+  const bounds=[];
+  if(d.origin)bounds.push([d.origin.lat,d.origin.lng]);
+  if(d.destination)bounds.push([d.destination.lat,d.destination.lng]);
+  (d.intersection_path||[]).forEach(id=>{if(gNodes[id])bounds.push([gNodes[id].lat,gNodes[id].lng]);});
+  if(bounds.length>=2)map.fitBounds(bounds,{padding:[60,60],maxZoom:14});
+
+  // Mark origin + destination
+  const tempMarkers=[];
+  if(d.origin){const m=L.circleMarker([d.origin.lat,d.origin.lng],{radius:11,fillColor:'#EF4444',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindTooltip('ORIGIN',{permanent:true,direction:'top',offset:[0,-10]});tempMarkers.push(m);}
+  if(d.destination){const m=L.circleMarker([d.destination.lat,d.destination.lng],{radius:11,fillColor:'#EF4444',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindTooltip(d.destination.name||'DEST',{permanent:true,direction:'top',offset:[0,-10]});tempMarkers.push(m);}
+
+  // Animate steps
+  for(const s of steps){
+    if(s.action==='init'){
+      mlog(body,`<span class="s">INIT</span> A* Search: <span class="h">${s.start_name}</span> &rarr; <span class="h">${s.end_name}</span>`);
+      mlog(body,`<span class="dim">h(n) = haversine(n, dest) / 15 m/s</span>`);
+      mlog(body,`<span class="dim">f(n) = g(n) + h(n) where g = actual cost, h = heuristic</span>`);
+    } else if(s.action==='visit'){
+      if(markers[s.node])markers[s.node].setStyle({fillColor:'#3B82F6',radius:10});
+      mlog(body,`<span class="s">[${s.step}]</span> VISIT <span class="b">${s.name}</span> | g=${s.g_score}s, f=${s.f_score}s <span class="dim">(${s.visited_count} visited)</span>`);
+      await sleep(180);
+    } else if(s.action==='relax'){
+      const el=edgeLines.find(l=>l._e&&((l._e.from===s.from&&l._e.to===s.to)||(l._e.from===s.to&&l._e.to===s.from)));
+      if(el)el.setStyle({color:'#F59E0B',weight:3,opacity:1,dashArray:null});
+      if(markers[s.to])markers[s.to].setStyle({fillColor:'#F59E0B',radius:9});
+      mlog(body,`<span class="s">[${s.step}]</span> RELAX ${s.from_name}&rarr;${s.to_name} w=${s.weight}s | g'=${s.new_dist}s, f'=${s.f_score}s <span class="dim">${s.new_dist<999?'(improved)':''}</span>`);
+      await sleep(100);
+    } else if(s.action==='found'){
+      mlog(body,`<span class="s">FOUND</span> <span class="h">Destination reached! Total cost: ${s.total_cost}s = ${(s.total_cost/60).toFixed(1)} min</span>`);
+    } else if(s.action==='path'){
+      edgeLines.forEach(l=>l.setStyle({color:'#2a3344',weight:1.5,opacity:.4,dashArray:'4,4'}));
+      const coords=[];
+      if(d.origin)coords.push([d.origin.lat,d.origin.lng]);
+      s.path.forEach(id=>{if(gNodes[id])coords.push([gNodes[id].lat,gNodes[id].lng]);});
+      if(d.destination)coords.push([d.destination.lat,d.destination.lng]);
+      if(pathLine)map.removeLayer(pathLine);
+      pathLine=L.polyline(coords,{color:'#10B981',weight:5,opacity:1}).addTo(map);
+      s.path.forEach((id,i)=>{
+        if(markers[id])markers[id].setStyle({fillColor:'#10B981',radius:11});
+        if(i<s.path.length-1){const nx=s.path[i+1];const el=edgeLines.find(l=>l._e&&((l._e.from===id&&l._e.to===nx)||(l._e.from===nx&&l._e.to===id)));if(el)el.setStyle({color:'#10B981',weight:5,opacity:1,dashArray:null});}
+      });
+      mlog(body,`<span class="s">PATH</span> <span class="h">${s.path_names.join(' &rarr; ')}</span>`);
+      mlog(body,`<span class="s">COST</span> ${s.total_cost_seconds}s = <span class="h">${(s.total_cost_seconds/60).toFixed(1)} min</span> via ${s.path.length} intersections`);
+      mlog(body,`<span class="s">OSRM</span> Road distance: <span class="h">${d.distance_km} km</span>, ETA: <span class="h">${d.eta_minutes} min</span>`);
+    }
+  }
+
+  // Vehicle marker
+  if(d.origin){
+    if(vehMarkers[d.mission_id])map.removeLayer(vehMarkers[d.mission_id]);
+    vehMarkers[d.mission_id]=L.marker([d.origin.lat,d.origin.lng],{
+      icon:L.divIcon({className:'',html:'<div style="width:18px;height:18px;background:#10B981;border:3px solid #fff;border-radius:50%;box-shadow:0 0 12px rgba(16,185,129,.5)"></div>',iconSize:[18,18],iconAnchor:[9,9]})
+    }).addTo(map).bindTooltip(d.vehicle_id);
+  }
+}
+
+function replayMission(mid){
+  const card=document.getElementById('mc-'+mid);
+  if(card&&card._data){resetMapViz();vizMission(card._data);}
+}
+
+function handleMove(d){
+  if(vehMarkers[d.mission_id])vehMarkers[d.mission_id].setLatLng([d.lat,d.lng]);
+}
+function handleDone(d){
+  const c=document.getElementById('mc-'+d.mission_id);if(c)c.style.opacity='.35';
+  if(vehMarkers[d.mission_id]){map.removeLayer(vehMarkers[d.mission_id]);delete vehMarkers[d.mission_id];}
+}
+
+// Manual mode with map click + search
+async function runManual(){
+  if(!manualOrigin||!manualDest)return;
+  resetMapViz();running=true;document.getElementById('btnRun').disabled=true;
+  const delay=()=>parseInt(document.getElementById('speed').value);
+  const body=document.getElementById('manualMath');body.innerHTML='';
+
+  // Snap to nearest graph nodes
+  const startId=snapToNode(manualOrigin.lat,manualOrigin.lng);
+  const endId=snapToNode(manualDest.lat,manualDest.lng);
+  if(!startId||!endId){mlog(body,'No nearby intersections found');return;}
+
+  // Build adjacency
+  const graph={};Object.keys(gNodes).forEach(n=>graph[n]={});
+  gEdges.forEach(e=>{graph[e.from_id][e.to_id]=e.weight;});
+
+  function h(nid){const n=gNodes[nid],e=gNodes[endId];return hav(n.lat,n.lng,e.lat,e.lng)/15.0;}
+
+  const dist={},prev={},visited=new Set();
+  Object.keys(gNodes).forEach(n=>{dist[n]=Infinity;prev[n]=null;});
+  dist[startId]=0;
+  const pq=[{f:h(startId),g:0,node:startId}];
+  let step=0;
+
+  markers[startId].setStyle({fillColor:'#EF4444',radius:12});
+  markers[endId].setStyle({fillColor:'#EF4444',radius:12});
+  mlog(body,`<span class="s">INIT</span> A*(${gNodes[startId].name} &rarr; ${gNodes[endId].name})`);
+  mlog(body,`<span class="dim">f(n) = g(n) + h(n), h(n) = haversine(n, dest) / 15 m/s</span>`);
+  mlog(body,`<span class="dim">h(start) = ${h(startId).toFixed(1)}s</span>`);
+
+  while(pq.length>0&&running){
+    pq.sort((a,b)=>a.f-b.f);
+    const{node:cur,g:gs}=pq.shift();
+    if(visited.has(cur))continue;
+    visited.add(cur);step++;
+    if(cur!==startId&&cur!==endId)markers[cur].setStyle({fillColor:'#3B82F6',radius:10});
+    document.getElementById('sv').textContent=visited.size;
+    mlog(body,`<span class="s">[${step}]</span> VISIT <span class="b">${gNodes[cur].name}</span> | g=${Math.round(gs)}s, f=${Math.round(gs+h(cur))}s`);
+    await sleep(delay());
+    if(cur===endId){mlog(body,`<span class="s">FOUND</span> <span class="h">Cost: ${Math.round(dist[endId])}s = ${(dist[endId]/60).toFixed(1)}min</span>`);break;}
+    for(const[nb,w]of Object.entries(graph[cur]||{})){
+      if(visited.has(nb))continue;
+      const newG=dist[cur]+w;
+      const el=edgeLines.find(l=>l._e&&((l._e.from===cur&&l._e.to===nb)||(l._e.from===nb&&l._e.to===cur)));
+      if(el)el.setStyle({color:'#F59E0B',weight:3,opacity:1,dashArray:null});
+      if(nb!==endId&&markers[nb])markers[nb].setStyle({fillColor:'#F59E0B',radius:9});
+      if(newG<dist[nb]){
+        dist[nb]=newG;prev[nb]=cur;pq.push({f:newG+h(nb),g:newG,node:nb});
+        mlog(body,`<span class="s">[${step}]</span> RELAX ${gNodes[cur].name}&rarr;${gNodes[nb].name} w=${Math.round(w)}s g'=${Math.round(newG)}s f'=${Math.round(newG+h(nb))}s <span class="h">improved</span>`);
+      } else {
+        mlog(body,`<span class="s">[${step}]</span> SKIP ${gNodes[cur].name}&rarr;${gNodes[nb].name} ${Math.round(newG)}s >= ${Math.round(dist[nb])}s <span class="dim">no improvement</span>`);
+      }
+      await sleep(delay()/2);
+    }
+  }
+  // Reconstruct
+  const path=[];let c=endId;while(c){path.unshift(c);c=prev[c];}
+  if(path[0]!==startId){mlog(body,'<span class="r">No path found!</span>');document.getElementById('btnRun').disabled=false;return;}
+
+  edgeLines.forEach(l=>l.setStyle({color:'#2a3344',weight:1.5,opacity:.4,dashArray:'4,4'}));
+  const coords=[[manualOrigin.lat,manualOrigin.lng]];
+  path.forEach(n=>{if(gNodes[n])coords.push([gNodes[n].lat,gNodes[n].lng]);});
+  coords.push([manualDest.lat,manualDest.lng]);
+  if(pathLine)map.removeLayer(pathLine);
+  pathLine=L.polyline(coords,{color:'#10B981',weight:5}).addTo(map);
+  for(let i=0;i<path.length;i++){
+    markers[path[i]].setStyle({fillColor:'#10B981',radius:11});
+    if(i<path.length-1){const el=edgeLines.find(l=>l._e&&((l._e.from===path[i]&&l._e.to===path[i+1])||(l._e.from===path[i+1]&&l._e.to===path[i])));if(el)el.setStyle({color:'#10B981',weight:5,opacity:1,dashArray:null});}
+    await sleep(delay()/3);
+  }
+  markers[startId].setStyle({fillColor:'#EF4444',radius:12});
+  markers[endId].setStyle({fillColor:'#EF4444',radius:12});
+
+  const km=coords.reduce((s,c,i)=>i===0?0:s+hav(coords[i-1][0],coords[i-1][1],c[0],c[1])/1000,0);
+  document.getElementById('sd').textContent=km.toFixed(2)+' km';
+  document.getElementById('se').textContent=(dist[endId]/60).toFixed(1)+' min';
+  document.getElementById('sp').textContent=path.length;
+  mlog(body,`<span class="s">PATH</span> <span class="h">${path.map(n=>gNodes[n].name).join(' &rarr; ')}</span>`);
+  mlog(body,`<span class="s">RESULT</span> ${km.toFixed(2)} km | ${(dist[endId]/60).toFixed(1)} min | ${path.length} intersections`);
+  map.fitBounds(pathLine.getBounds().pad(.15));
+  document.getElementById('btnRun').disabled=false;
+}
+
+function resetManual(){
+  running=false;resetMapViz();
+  manualOrigin=null;manualDest=null;
+  if(manualOriginMarker){map.removeLayer(manualOriginMarker);manualOriginMarker=null;}
+  if(manualDestMarker){map.removeLayer(manualDestMarker);manualDestMarker=null;}
+  document.getElementById('originLabel').textContent='Click map for origin';document.getElementById('originLabel').style.color='#94A3B8';
+  document.getElementById('destLabel').textContent='Click map for destination';document.getElementById('destLabel').style.color='#94A3B8';
+  document.getElementById('btnRun').disabled=true;
+  document.getElementById('manualMath').innerHTML='';
+  ['sv','sd','se','sp'].forEach(id=>document.getElementById(id).textContent=id==='sv'?'0':'--');
+}
+
+// Helpers
+function resetMapViz(){
+  Object.values(markers).forEach(m=>m.setStyle({fillColor:'#475569',radius:7}));
+  edgeLines.forEach(l=>l.setStyle({color:'#2a3344',weight:1.5,opacity:.4,dashArray:'4,4'}));
+  if(pathLine){map.removeLayer(pathLine);pathLine=null;}
+}
+function snapToNode(lat,lng){
+  let best=null,bd=Infinity;
+  for(const[id,n]of Object.entries(gNodes)){const d=hav(lat,lng,n.lat,n.lng);if(d<bd){bd=d;best=id;}}
+  return best;
+}
+function mlog(el,html){el.innerHTML=`<div class="math-step">${html}</div>`+el.innerHTML;}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function hav(a,b,c,d){const R=6371000,p=Math.PI/180,x=Math.sin((c-a)*p/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin((d-b)*p/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+
+async function loadExisting(){try{const r=await fetch(API+'/api/driver/viz/missions');const m=await r.json();m.forEach(d=>handleNew(d));}catch(e){}}
+
+loadGraph();connectWS();loadExisting();
+</script>
+</body>
+</html>

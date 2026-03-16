@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PULSE - Algorithm Comparison</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f6fa;
+            color: #1a1a2e;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .hero {
+            text-align: center;
+            padding: 30px 0 20px;
+        }
+
+        .hero h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .hero p {
+            font-size: 0.95rem;
+            color: #666;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border-radius: 8px;
+            border: 1px solid #d0d5dd;
+            background: #fff;
+            color: #1a1a2e;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover { background: #f0f0f5; border-color: #2563eb; }
+
+        .btn.primary {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #fff;
+        }
+
+        .btn.primary:hover { background: #1d4ed8; }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .speed-control input[type="range"] { width: 80px; accent-color: #2563eb; }
+
+        .speed-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: #2563eb;
+            font-weight: 600;
+            min-width: 28px;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 18px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.72rem;
+            color: #666;
+        }
+
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .legend-line { width: 18px; height: 3px; border-radius: 2px; }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 14px;
+            margin-bottom: 30px;
+        }
+
+        .algo-card {
+            background: #fff;
+            border: 1px solid #e0e0e8;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        .algo-header {
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        .algo-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .algo-tag {
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 5px;
+        }
+
+        .algo-tag.classic { background: #fef3c7; color: #92400e; }
+        .algo-tag.best { background: #d1fae5; color: #065f46; }
+        .algo-tag.new { background: #ede9fe; color: #5b21b6; }
+        .algo-tag.default { background: #e0e7ff; color: #3730a3; }
+
+        .algo-complexity {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            color: #2563eb;
+            font-weight: 600;
+        }
+
+        .algo-canvas-wrap {
+            height: 280px;
+            background: #fafbfc;
+        }
+
+        .algo-canvas-wrap canvas { width: 100%; height: 100%; }
+
+        .algo-stats {
+            padding: 10px 16px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            border-top: 1px solid #eee;
+            background: #f8f9fb;
+        }
+
+        .stat { text-align: center; }
+
+        .stat-label {
+            font-size: 0.58rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #999;
+            margin-bottom: 1px;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .stat-value.green { color: #059669; }
+        .stat-value.blue { color: #2563eb; }
+
+        .winner-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            font-size: 0.58rem;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            z-index: 5;
+            color: #fff;
+        }
+
+        .winner-badge.primary { background: #059669; }
+        .winner-badge.paper { background: #7c3aed; }
+
+        /* Table */
+        .table-section { margin: 30px 0; }
+
+        .table-section h2 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #e0e0e8;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        .comparison-table th, .comparison-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            font-size: 0.83rem;
+        }
+
+        .comparison-table th {
+            background: #f8f9fb;
+            font-weight: 700;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #888;
+        }
+
+        .comparison-table tr:last-child td { border-bottom: none; }
+        .comparison-table tr:hover td { background: #f8f9ff; }
+
+        .comparison-table .mono {
+            font-family: 'JetBrains Mono', monospace;
+            color: #2563eb;
+            font-size: 0.8rem;
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.68rem;
+            font-weight: 700;
+        }
+
+        .chip.yes { background: #d1fae5; color: #065f46; }
+        .chip.no { background: #fee2e2; color: #991b1b; }
+        .chip.partial { background: #fef3c7; color: #92400e; }
+
+        /* Verdict */
+        .verdict {
+            background: #fff;
+            border: 1px solid #e0e0e8;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 30px 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        .verdict h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: 14px; }
+
+        .verdict-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 14px;
+        }
+
+        .verdict-item {
+            background: #f8f9fb;
+            border-radius: 10px;
+            padding: 16px;
+            border: 1px solid #eee;
+        }
+
+        .verdict-item h3 {
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: #2563eb;
+        }
+
+        .verdict-item p {
+            font-size: 0.8rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: #999;
+            font-size: 0.72rem;
+        }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="hero">
+        <h1>Shortest Path Algorithm Comparison</h1>
+        <p>Interactive side-by-side comparison of five shortest-path algorithms, from the 1956 Dijkstra classic to the 2025 paper that breaks the sorting barrier.</p>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#2563eb"></div> Source</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div> Target</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#059669"></div> Visited</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div> In Queue</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div> Pivot (2025)</div>
+        <div class="legend-item"><div class="legend-line" style="background:#059669"></div> Shortest Path</div>
+        <div class="legend-item"><div class="legend-line" style="background:rgba(37,99,235,0.3)"></div> Explored</div>
+    </div>
+
+    <div class="controls">
+        <button class="btn primary" id="btnRun" onclick="runAll()">Run All</button>
+        <button class="btn" onclick="resetAll()">Reset</button>
+        <button class="btn" onclick="newGraph()">New Graph</button>
+        <div class="speed-control">
+            Speed:
+            <input type="range" id="speedSlider" min="1" max="20" value="8" oninput="updateSpeed(this.value)">
+            <span class="speed-value" id="speedValue">8x</span>
+        </div>
+    </div>
+
+    <div class="grid" id="algoGrid"></div>
+
+    <div class="table-section">
+        <h2>Comparison Table</h2>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Time Complexity</th>
+                    <th>Year</th>
+                    <th>Type</th>
+                    <th>Neg. Weights</th>
+                    <th>Heuristic</th>
+                    <th>PULSE Role</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Dijkstra</strong></td>
+                    <td class="mono">O(m + n log n)</td>
+                    <td>1956</td>
+                    <td>Single-source, all targets</td>
+                    <td><span class="chip no">No</span></td>
+                    <td><span class="chip no">No</span></td>
+                    <td><span class="chip partial">Fallback</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Bellman-Ford</strong></td>
+                    <td class="mono">O(m * n)</td>
+                    <td>1958</td>
+                    <td>Single-source, all targets</td>
+                    <td><span class="chip yes">Yes</span></td>
+                    <td><span class="chip no">No</span></td>
+                    <td><span class="chip partial">Validation</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Floyd-Warshall</strong></td>
+                    <td class="mono">O(n&sup3;)</td>
+                    <td>1962</td>
+                    <td>All-pairs</td>
+                    <td><span class="chip partial">Detects</span></td>
+                    <td><span class="chip no">No</span></td>
+                    <td><span class="chip yes">Pre-compute</span></td>
+                </tr>
+                <tr>
+                    <td><strong>A*</strong></td>
+                    <td class="mono">O(m + n log n)</td>
+                    <td>1968</td>
+                    <td>Single-source, one target</td>
+                    <td><span class="chip no">No</span></td>
+                    <td><span class="chip yes">Yes</span></td>
+                    <td><span class="chip yes">Primary</span></td>
+                </tr>
+                <tr style="background:#f5f3ff">
+                    <td><strong>2025 Breakthrough</strong></td>
+                    <td class="mono">O(m log<sup>2/3</sup> n)</td>
+                    <td>2025</td>
+                    <td>Single-source, directed</td>
+                    <td><span class="chip no">No</span></td>
+                    <td><span class="chip no">No</span></td>
+                    <td><span class="chip yes">Future</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="verdict">
+        <h2>How PULSE Uses These Algorithms</h2>
+        <div class="verdict-grid">
+            <div class="verdict-item">
+                <h3>A* -- Real-time EV Routing</h3>
+                <p>Primary algorithm for ambulance navigation. Uses GPS coordinates as heuristic to find the fastest route to hospital. Re-runs every few seconds as the vehicle moves. Explores fewer nodes than Dijkstra by focusing toward the target.</p>
+            </div>
+            <div class="verdict-item">
+                <h3>Floyd-Warshall -- City Corridor Matrix</h3>
+                <p>Pre-computes all-pairs shortest paths between major intersections at startup. Traffic Authority uses this matrix for instant green corridor planning with no computation delay when seconds matter.</p>
+            </div>
+            <div class="verdict-item">
+                <h3>2025 Breakthrough -- The Frontier</h3>
+                <p>Breaks the O(n log n) sorting barrier by hybridizing Dijkstra + Bellman-Ford with divide-and-conquer and FindPivots. Achieves O(m log^(2/3) n). Proves faster SSSP is possible for city-scale directed road networks.</p>
+            </div>
+            <div class="verdict-item">
+                <h3>Bellman-Ford -- Graph Validator</h3>
+                <p>Used offline to verify that our traffic graph has no negative cycles (which would indicate a modeling bug in edge weights). Its ability to detect negative cycles makes it a safety net, not a primary router.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        PULSE -- Prayatna Hackathon 2026 | Algorithm visualizations are simplified demonstrations of each algorithm's exploration pattern
+    </div>
+</div>
+
+<script>
+// ========================
+// GRAPH
+// ========================
+const NODE_COUNT = 18;
+let graph = {};
+let sourceNode = 0;
+let targetNode = NODE_COUNT - 1;
+let animSpeed = 8;
+let running = false;
+
+function updateSpeed(v) {
+    animSpeed = parseInt(v);
+    document.getElementById('speedValue').textContent = v + 'x';
+}
+
+function generateGraph() {
+    const nodes = [];
+    const padding = 45;
+    const cols = 6, rows = 3;
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const x = padding + (c / (cols - 1)) * (400 - 2 * padding) + (Math.random() - 0.5) * 25;
+            const y = padding + (r / (rows - 1)) * (280 - 2 * padding) + (Math.random() - 0.5) * 20;
+            nodes.push({ x, y });
+        }
+    }
+
+    const edges = [];
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const i = r * cols + c;
+            if (c < cols - 1) {
+                const j = r * cols + c + 1;
+                const w = Math.floor(eucDist(nodes[i], nodes[j]) / 8) + Math.floor(Math.random() * 5) + 1;
+                edges.push({ from: i, to: j, weight: w });
+                edges.push({ from: j, to: i, weight: w });
+            }
+            if (r < rows - 1) {
+                const j = (r + 1) * cols + c;
+                const w = Math.floor(eucDist(nodes[i], nodes[j]) / 8) + Math.floor(Math.random() * 5) + 1;
+                edges.push({ from: i, to: j, weight: w });
+                edges.push({ from: j, to: i, weight: w });
+            }
+            if (c < cols - 1 && r < rows - 1 && Math.random() < 0.4) {
+                const j = (r + 1) * cols + c + 1;
+                const w = Math.floor(eucDist(nodes[i], nodes[j]) / 6) + Math.floor(Math.random() * 5) + 2;
+                edges.push({ from: i, to: j, weight: w });
+                edges.push({ from: j, to: i, weight: w });
+            }
+        }
+    }
+    for (let k = 0; k < 4; k++) {
+        const i = Math.floor(Math.random() * NODE_COUNT);
+        let j = Math.floor(Math.random() * NODE_COUNT);
+        if (i !== j && !edges.find(e => e.from === i && e.to === j)) {
+            const w = Math.floor(eucDist(nodes[i], nodes[j]) / 6) + Math.floor(Math.random() * 8) + 3;
+            edges.push({ from: i, to: j, weight: w });
+            edges.push({ from: j, to: i, weight: w });
+        }
+    }
+
+    const adj = {};
+    for (let i = 0; i < NODE_COUNT; i++) adj[i] = [];
+    for (const e of edges) adj[e.from].push({ to: e.to, weight: e.weight });
+
+    sourceNode = 0;
+    targetNode = NODE_COUNT - 1;
+    graph = { nodes, edges, adj };
+}
+
+function eucDist(a, b) {
+    return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+}
+
+// ========================
+// ALGORITHM DEFINITIONS
+// ========================
+const algorithms = [
+    { id: 'dijkstra', name: 'Dijkstra', complexity: 'O(m + n log n)', tag: 'Classic', tagClass: 'classic' },
+    { id: 'bellman-ford', name: 'Bellman-Ford', complexity: 'O(m * n)', tag: 'Robust', tagClass: 'classic' },
+    { id: 'floyd-warshall', name: 'Floyd-Warshall', complexity: 'O(n^3)', tag: 'All-Pairs', tagClass: 'default' },
+    { id: 'astar', name: 'A*', complexity: 'O(m + n log n)', tag: 'Best Practical', tagClass: 'best' },
+    { id: 'breakthrough', name: '2025 Breakthrough', complexity: 'O(m log^(2/3) n)', tag: '2025 Paper', tagClass: 'new' }
+];
+
+// ========================
+// RENDER
+// ========================
+function renderCards() {
+    const grid = document.getElementById('algoGrid');
+    grid.innerHTML = '';
+    for (const algo of algorithms) {
+        const card = document.createElement('div');
+        card.className = 'algo-card';
+        card.id = `card-${algo.id}`;
+        let badge = '';
+        card.innerHTML = `
+            ${badge}
+            <div class="algo-header">
+                <div class="algo-name">${algo.name} <span class="algo-tag ${algo.tagClass}">${algo.tag}</span></div>
+                <div class="algo-complexity">${algo.complexity}</div>
+            </div>
+            <div class="algo-canvas-wrap"><canvas id="canvas-${algo.id}" width="800" height="560"></canvas></div>
+            <div class="algo-stats">
+                <div class="stat"><div class="stat-label">Visited</div><div class="stat-value" id="stat-visited-${algo.id}">--</div></div>
+                <div class="stat"><div class="stat-label">Relaxations</div><div class="stat-value" id="stat-relax-${algo.id}">--</div></div>
+                <div class="stat"><div class="stat-label">Path Cost</div><div class="stat-value blue" id="stat-cost-${algo.id}">--</div></div>
+                <div class="stat"><div class="stat-label">Time (ms)</div><div class="stat-value" id="stat-time-${algo.id}">--</div></div>
+            </div>`;
+        grid.appendChild(card);
+    }
+}
+
+// ========================
+// DRAWING
+// ========================
+function drawGraph(canvasId, st) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const sx = w / 400, sy = h / 280;
+
+    const vis = st.visited || new Set();
+    const front = st.frontier || new Set();
+    const exEdges = st.exploredEdges || new Set();
+    const pathE = st.pathEdges || new Set();
+    const pivs = st.pivots || new Set();
+
+    // Edges
+    for (const e of graph.edges) {
+        if (e.from > e.to) continue;
+        const a = graph.nodes[e.from], b = graph.nodes[e.to];
+        const ek = `${e.from}-${e.to}`, ekr = `${e.to}-${e.from}`;
+        const isPath = pathE.has(ek) || pathE.has(ekr);
+        const isExp = exEdges.has(ek) || exEdges.has(ekr);
+
+        ctx.beginPath();
+        ctx.moveTo(a.x * sx, a.y * sy);
+        ctx.lineTo(b.x * sx, b.y * sy);
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = 'transparent';
+
+        if (isPath) {
+            ctx.strokeStyle = '#059669';
+            ctx.lineWidth = 4;
+            ctx.shadowColor = '#059669';
+            ctx.shadowBlur = 8;
+        } else if (isExp) {
+            ctx.strokeStyle = 'rgba(37,99,235,0.25)';
+            ctx.lineWidth = 2;
+        } else {
+            ctx.strokeStyle = '#d0d5dd';
+            ctx.lineWidth = 1;
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        if (isExp || isPath) {
+            const mx = (a.x + b.x) / 2 * sx, my = (a.y + b.y) / 2 * sy;
+            ctx.font = '600 15px JetBrains Mono';
+            ctx.fillStyle = isPath ? '#059669' : '#aaa';
+            ctx.textAlign = 'center';
+            ctx.fillText(e.weight, mx, my - 5);
+        }
+    }
+
+    // Nodes
+    for (let i = 0; i < graph.nodes.length; i++) {
+        const n = graph.nodes[i];
+        const x = n.x * sx, y = n.y * sy;
+        let fill = '#e8e8ee', stroke = '#bbb', radius = 14;
+
+        if (i === sourceNode) { fill = '#2563eb'; stroke = '#2563eb'; radius = 17; }
+        else if (i === targetNode) { fill = '#dc2626'; stroke = '#dc2626'; radius = 17; }
+        else if (pivs.has(i)) { fill = '#7c3aed'; stroke = '#7c3aed'; radius = 15; }
+        else if (vis.has(i)) { fill = '#059669'; stroke = '#059669'; radius = 15; }
+        else if (front.has(i)) { fill = '#d97706'; stroke = '#d97706'; radius = 15; }
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = '700 13px Inter';
+        ctx.fillStyle = (i === sourceNode || i === targetNode || vis.has(i) || front.has(i) || pivs.has(i)) ? '#fff' : '#555';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(i, x, y);
+
+        if (st.dist && st.dist[i] !== undefined && st.dist[i] !== Infinity && i !== sourceNode) {
+            ctx.font = '600 12px JetBrains Mono';
+            ctx.fillStyle = '#2563eb';
+            ctx.fillText(st.dist[i], x, y - radius - 7);
+        }
+    }
+}
+
+// ========================
+// ALGORITHMS
+// ========================
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function getDelay() { return Math.max(5, 250 / animSpeed); }
+
+function updateStats(prefix, visited, relaxations, cost, time) {
+    document.getElementById(`stat-visited-${prefix}`).textContent = visited;
+    document.getElementById(`stat-relax-${prefix}`).textContent = relaxations;
+    document.getElementById(`stat-cost-${prefix}`).textContent = cost === Infinity ? 'inf' : cost;
+    document.getElementById(`stat-time-${prefix}`).textContent = time.toFixed(0);
+}
+
+function buildPathEdges(prev, target) {
+    const pe = new Set();
+    let cur = target;
+    while (prev[cur] !== -1) { pe.add(`${prev[cur]}-${cur}`); cur = prev[cur]; }
+    return pe;
+}
+
+// Dijkstra
+async function runDijkstra(cid, sp) {
+    const n = NODE_COUNT, d = Array(n).fill(Infinity), prev = Array(n).fill(-1);
+    const vis = new Set(), front = new Set(), exE = new Set();
+    let rel = 0; const t0 = performance.now();
+    d[sourceNode] = 0;
+    const pq = [[0, sourceNode]];
+    front.add(sourceNode);
+    while (pq.length > 0) {
+        pq.sort((a, b) => a[0] - b[0]);
+        const [dd, u] = pq.shift();
+        if (vis.has(u)) continue;
+        vis.add(u); front.delete(u);
+        drawGraph(cid, { visited: vis, frontier: front, exploredEdges: exE, pathEdges: new Set(), dist: d });
+        updateStats(sp, vis.size, rel, d[targetNode], performance.now() - t0);
+        await sleep(getDelay());
+        for (const e of graph.adj[u]) {
+            exE.add(`${u}-${e.to}`); rel++;
+            if (d[u] + e.weight < d[e.to]) { d[e.to] = d[u] + e.weight; prev[e.to] = u; pq.push([d[e.to], e.to]); front.add(e.to); }
+        }
+    }
+    const pe = buildPathEdges(prev, targetNode);
+    const el = performance.now() - t0;
+    drawGraph(cid, { visited: vis, frontier: new Set(), exploredEdges: exE, pathEdges: pe, dist: d });
+    updateStats(sp, vis.size, rel, d[targetNode], el);
+}
+
+// Bellman-Ford
+async function runBellmanFord(cid, sp) {
+    const n = NODE_COUNT, d = Array(n).fill(Infinity), prev = Array(n).fill(-1);
+    const vis = new Set(), exE = new Set();
+    let rel = 0; const t0 = performance.now();
+    d[sourceNode] = 0;
+    for (let phase = 0; phase < n - 1; phase++) {
+        let upd = false;
+        for (const e of graph.edges) {
+            if (d[e.from] === Infinity) continue;
+            rel++; exE.add(`${e.from}-${e.to}`);
+            if (d[e.from] + e.weight < d[e.to]) { d[e.to] = d[e.from] + e.weight; prev[e.to] = e.from; vis.add(e.to); upd = true; }
+        }
+        drawGraph(cid, { visited: vis, frontier: new Set(), exploredEdges: exE, pathEdges: new Set(), dist: d });
+        updateStats(sp, vis.size, rel, d[targetNode], performance.now() - t0);
+        await sleep(getDelay() * 2);
+        if (!upd) break;
+    }
+    const pe = buildPathEdges(prev, targetNode);
+    const el = performance.now() - t0;
+    drawGraph(cid, { visited: vis, frontier: new Set(), exploredEdges: exE, pathEdges: pe, dist: d });
+    updateStats(sp, vis.size, rel, d[targetNode], el);
+}
+
+// Floyd-Warshall
+async function runFloydWarshall(cid, sp) {
+    const n = NODE_COUNT;
+    const D = Array.from({ length: n }, () => Array(n).fill(Infinity));
+    const nxt = Array.from({ length: n }, () => Array(n).fill(-1));
+    const vis = new Set(), exE = new Set();
+    let rel = 0; const t0 = performance.now();
+    for (let i = 0; i < n; i++) { D[i][i] = 0; nxt[i][i] = i; }
+    for (const e of graph.edges) { if (e.weight < D[e.from][e.to]) { D[e.from][e.to] = e.weight; nxt[e.from][e.to] = e.to; } }
+    for (let k = 0; k < n; k++) {
+        vis.add(k);
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                rel++;
+                if (D[i][k] + D[k][j] < D[i][j]) { D[i][j] = D[i][k] + D[k][j]; nxt[i][j] = nxt[i][k]; if (i === sourceNode) exE.add(`${k}-${j}`); }
+            }
+        }
+        drawGraph(cid, { visited: vis, frontier: new Set([k]), exploredEdges: exE, pathEdges: new Set(), dist: D[sourceNode] });
+        updateStats(sp, vis.size, rel, D[sourceNode][targetNode], performance.now() - t0);
+        await sleep(getDelay() * 1.5);
+    }
+    const pe = new Set();
+    let cur = sourceNode;
+    while (cur !== targetNode && cur !== -1) { const nx = nxt[cur][targetNode]; if (nx === -1) break; pe.add(`${cur}-${nx}`); cur = nx; }
+    const el = performance.now() - t0;
+    drawGraph(cid, { visited: vis, frontier: new Set(), exploredEdges: exE, pathEdges: pe, dist: D[sourceNode] });
+    updateStats(sp, vis.size, rel, D[sourceNode][targetNode], el);
+}
+
+// A*
+async function runAStar(cid, sp) {
+    const n = NODE_COUNT, d = Array(n).fill(Infinity), prev = Array(n).fill(-1);
+    const vis = new Set(), front = new Set(), exE = new Set();
+    let rel = 0; const t0 = performance.now();
+    const tgt = graph.nodes[targetNode];
+    function h(i) { return eucDist(graph.nodes[i], tgt) / 8; }
+    d[sourceNode] = 0;
+    const pq = [[h(sourceNode), 0, sourceNode]];
+    front.add(sourceNode);
+    while (pq.length > 0) {
+        pq.sort((a, b) => a[0] - b[0]);
+        const [f, g, u] = pq.shift();
+        if (vis.has(u)) continue;
+        vis.add(u); front.delete(u);
+        drawGraph(cid, { visited: vis, frontier: front, exploredEdges: exE, pathEdges: new Set(), dist: d });
+        updateStats(sp, vis.size, rel, d[targetNode], performance.now() - t0);
+        await sleep(getDelay());
+        if (u === targetNode) break;
+        for (const e of graph.adj[u]) {
+            exE.add(`${u}-${e.to}`); rel++;
+            const nd = d[u] + e.weight;
+            if (nd < d[e.to]) { d[e.to] = nd; prev[e.to] = u; pq.push([nd + h(e.to), nd, e.to]); front.add(e.to); }
+        }
+    }
+    const pe = buildPathEdges(prev, targetNode);
+    const el = performance.now() - t0;
+    drawGraph(cid, { visited: vis, frontier: new Set(), exploredEdges: exE, pathEdges: pe, dist: d });
+    updateStats(sp, vis.size, rel, d[targetNode], el);
+}
+
+// 2025 Breakthrough (simplified demonstration of the paper's key ideas)
+// Hybrid Dijkstra + Bellman-Ford with FindPivots frontier reduction
+async function runBreakthrough(cid, sp) {
+    const n = NODE_COUNT, d = Array(n).fill(Infinity), prev = Array(n).fill(-1);
+    const vis = new Set(), front = new Set(), exE = new Set(), pivots = new Set();
+    let rel = 0; const t0 = performance.now();
+    const k = Math.max(2, Math.floor(Math.pow(Math.log2(n), 1 / 3)));
+
+    d[sourceNode] = 0;
+    vis.add(sourceNode);
+
+    // Step 1: Build initial frontier from source (like Dijkstra first step)
+    for (const e of graph.adj[sourceNode]) {
+        exE.add(`${sourceNode}-${e.to}`); rel++;
+        if (d[sourceNode] + e.weight < d[e.to]) { d[e.to] = d[sourceNode] + e.weight; prev[e.to] = sourceNode; front.add(e.to); }
+    }
+    drawGraph(cid, { visited: vis, frontier: front, exploredEdges: exE, pathEdges: new Set(), dist: d, pivots });
+    updateStats(sp, vis.size, rel, d[targetNode], performance.now() - t0);
+    await sleep(getDelay() * 2);
+
+    // Step 2: Process frontier in rounds using BMSSP approach
+    let safetyCounter = 0;
+    while (front.size > 0 && safetyCounter++ < n * 2) {
+        const S = [...front].filter(v => !vis.has(v));
+        if (S.length === 0) break;
+
+        // === FindPivots: k-step Bellman-Ford from frontier S ===
+        // Paper's key idea: relax k steps outward from S to find
+        // which frontier nodes are "pivots" (have large subtrees)
+        let layerVerts = new Set(S);
+        let curLayer = new Set(S);
+        const subtreeCnt = {};
+        S.forEach(v => subtreeCnt[v] = 0);
+
+        for (let step = 0; step < k && curLayer.size > 0; step++) {
+            const nxtLayer = new Set();
+            for (const u of curLayer) {
+                for (const e of graph.adj[u]) {
+                    exE.add(`${u}-${e.to}`); rel++;
+                    if (d[u] !== Infinity && d[u] + e.weight < d[e.to]) {
+                        d[e.to] = d[u] + e.weight; prev[e.to] = u;
+                        if (!layerVerts.has(e.to) && !vis.has(e.to)) {
+                            nxtLayer.add(e.to); layerVerts.add(e.to);
+                            // Track subtree sizes for pivot identification
+                            let root = u;
+                            const sSet = new Set(S);
+                            while (!sSet.has(root) && prev[root] !== -1) root = prev[root];
+                            if (sSet.has(root)) subtreeCnt[root] = (subtreeCnt[root] || 0) + 1;
+                        }
+                    }
+                }
+            }
+            curLayer = nxtLayer;
+            drawGraph(cid, { visited: vis, frontier: front, exploredEdges: exE, pathEdges: new Set(), dist: d, pivots });
+            await sleep(getDelay());
+        }
+
+        // Mark pivots: frontier nodes whose subtree has >= k descendants
+        S.filter(v => (subtreeCnt[v] || 0) >= k).forEach(v => pivots.add(v));
+
+        // === Partial sort: only extract a chunk of size |S|/k ===
+        // Paper's insight: we don't need to fully sort the frontier.
+        // Only sort a small chunk, process it, then repeat.
+        const sorted = S.sort((a, b) => d[a] - d[b]);
+        const chunkSize = Math.max(1, Math.ceil(sorted.length / k));
+        const chunk = sorted.slice(0, chunkSize);
+
+        // Complete the chunk (Dijkstra-like extraction of minimum)
+        for (const u of chunk) {
+            vis.add(u); front.delete(u);
+            for (const e of graph.adj[u]) {
+                exE.add(`${u}-${e.to}`); rel++;
+                if (d[u] + e.weight < d[e.to]) { d[e.to] = d[u] + e.weight; prev[e.to] = u; if (!vis.has(e.to)) front.add(e.to); }
+            }
+            drawGraph(cid, { visited: vis, frontier: front, exploredEdges: exE, pathEdges: new Set(), dist: d, pivots });
+            updateStats(sp, vis.size, rel, d[targetNode], performance.now() - t0);
+            await sleep(getDelay());
+        }
+
+        // Resolve non-pivot vertices discovered by BF steps
+        // (vertices whose shortest path uses few edges from S, so BF already found them)
+        for (const v of layerVerts) {
+            if (!vis.has(v) && d[v] !== Infinity) {
+                vis.add(v); front.delete(v);
+                for (const e of graph.adj[v]) {
+                    rel++; exE.add(`${v}-${e.to}`);
+                    if (d[v] + e.weight < d[e.to]) { d[e.to] = d[v] + e.weight; prev[e.to] = v; if (!vis.has(e.to)) front.add(e.to); }
+                }
+            }
+        }
+
+        drawGraph(cid, { visited: vis, frontier: front, exploredEdges: exE, pathEdges: new Set(), dist: d, pivots });
+        updateStats(sp, vis.size, rel, d[targetNode], performance.now() - t0);
+        await sleep(getDelay());
+
+        // Clean frontier
+        for (const v of front) { if (vis.has(v)) front.delete(v); }
+    }
+
+    const pe = buildPathEdges(prev, targetNode);
+    const el = performance.now() - t0;
+    drawGraph(cid, { visited: vis, frontier: new Set(), exploredEdges: exE, pathEdges: pe, dist: d, pivots });
+    updateStats(sp, vis.size, rel, d[targetNode], el);
+}
+
+// ========================
+// CONTROLS
+// ========================
+function colorStats() {
+    for (const metric of ['visited', 'relax', 'time']) {
+        let best = Infinity, bestId = '';
+        for (const algo of algorithms) {
+            const el = document.getElementById(`stat-${metric}-${algo.id}`);
+            const val = parseFloat(el.textContent);
+            if (!isNaN(val) && val < best) { best = val; bestId = algo.id; }
+        }
+        if (bestId) document.getElementById(`stat-${metric}-${bestId}`).classList.add('green');
+    }
+}
+
+async function runAll() {
+    if (running) return;
+    running = true;
+    document.getElementById('btnRun').textContent = 'Running...';
+    document.getElementById('btnRun').disabled = true;
+
+    await Promise.all([
+        runDijkstra('canvas-dijkstra', 'dijkstra'),
+        runBellmanFord('canvas-bellman-ford', 'bellman-ford'),
+        runFloydWarshall('canvas-floyd-warshall', 'floyd-warshall'),
+        runAStar('canvas-astar', 'astar'),
+        runBreakthrough('canvas-breakthrough', 'breakthrough')
+    ]);
+
+    colorStats();
+    running = false;
+    document.getElementById('btnRun').textContent = 'Run All';
+    document.getElementById('btnRun').disabled = false;
+}
+
+function resetAll() {
+    running = false;
+    for (const algo of algorithms) {
+        drawGraph(`canvas-${algo.id}`, {});
+        ['visited', 'relax', 'cost', 'time'].forEach(m => {
+            const el = document.getElementById(`stat-${m}-${algo.id}`);
+            el.textContent = '--'; el.className = 'stat-value' + (m === 'cost' ? ' blue' : '');
+        });
+    }
+    document.getElementById('btnRun').textContent = 'Run All';
+    document.getElementById('btnRun').disabled = false;
+}
+
+function newGraph() { generateGraph(); resetAll(); }
+
+// Init
+generateGraph();
+renderCards();
+for (const algo of algorithms) drawGraph(`canvas-${algo.id}`, {});
+</script>
+
+</body>
+</html>

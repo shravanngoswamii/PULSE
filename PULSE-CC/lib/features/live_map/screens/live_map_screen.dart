@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
@@ -20,7 +21,7 @@ class LiveMapScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
 
   @override
   void initState() {
@@ -37,30 +38,45 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Layer 1 - Google Map
-          GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(18.5204, 73.8567),
-              zoom: 14.0,
+          // Layer 1 - OpenStreetMap
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: const LatLng(22.7196, 75.8577),
+              initialZoom: 14.0,
+              onTap: (_, __) => ref.read(liveMapControllerProvider.notifier).clearSelection(),
             ),
-            mapType: state.mapType,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            onMapCreated: (controller) => _mapController = controller,
-            onTap: (_) => ref.read(liveMapControllerProvider.notifier).clearSelection(),
-            polylines: state.showEmergencyVehicles ? CorridorOverlay.getCorridors(state.activeMissions) : {},
-            markers: {
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.pulse.ta',
+              ),
+              // Corridor polylines
               if (state.showEmergencyVehicles)
-                ...state.activeMissions.map((mission) => VehicleMarker.create(
-                      mission,
-                      etaMinutes: mission.vehicle.etaSeconds ~/ 60,
-                    )),
+                CorridorOverlay.getCorridorLayer(state.activeMissions),
+              // Vehicle markers
+              if (state.showEmergencyVehicles)
+                MarkerLayer(
+                  markers: state.activeMissions
+                      .map((mission) => VehicleMarker.create(
+                            mission,
+                            etaMinutes: mission.vehicle.etaSeconds ~/ 60,
+                          ))
+                      .toList(),
+                ),
+              // Signal markers
               if (state.showSignals)
-                ...state.intersections.map((intersection) => SignalMarker.create(
-                      intersection,
-                      onTap: () => ref.read(liveMapControllerProvider.notifier).selectIntersection(intersection),
-                    )),
-            },
+                MarkerLayer(
+                  markers: state.intersections
+                      .map((intersection) => SignalMarker.create(
+                            intersection,
+                            onTap: () => ref
+                                .read(liveMapControllerProvider.notifier)
+                                .selectIntersection(intersection),
+                          ))
+                      .toList(),
+                ),
+            ],
           ),
 
           // Layer 2 - Top Bar
@@ -105,16 +121,28 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
             top: MediaQuery.of(context).padding.top + 80,
             child: Column(
               children: [
-                _ZoomButton(icon: Icons.add, onTap: () => _mapController?.animateCamera(CameraUpdate.zoomIn())),
+                _ZoomButton(
+                  icon: Icons.add,
+                  onTap: () {
+                    final zoom = _mapController.camera.zoom + 1;
+                    _mapController.move(_mapController.camera.center, zoom);
+                  },
+                ),
                 const SizedBox(height: 8),
-                _ZoomButton(icon: Icons.remove, onTap: () => _mapController?.animateCamera(CameraUpdate.zoomOut())),
+                _ZoomButton(
+                  icon: Icons.remove,
+                  onTap: () {
+                    final zoom = _mapController.camera.zoom - 1;
+                    _mapController.move(_mapController.camera.center, zoom);
+                  },
+                ),
               ],
             ),
           ),
 
           // Layer 7 & 8 - Bottom Persistent Controls
           Positioned(
-            bottom: 64, // Height of Bottom Nav
+            bottom: 64,
             left: 0,
             right: 0,
             child: Column(

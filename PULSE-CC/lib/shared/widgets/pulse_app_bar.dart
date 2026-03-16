@@ -49,17 +49,14 @@ class PulseAppBar extends StatelessWidget implements PreferredSizeWidget {
         if (showProfile)
           Padding(
             padding: const EdgeInsets.only(right: 16.0, left: 8.0),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.primary,
-            child: ClipOval(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
               child: Image.asset(
                 'assets/images/pulse_logo.png',
                 width: 32,
                 height: 32,
                 fit: BoxFit.cover,
               ),
-            ),
             ),
           ),
       ],

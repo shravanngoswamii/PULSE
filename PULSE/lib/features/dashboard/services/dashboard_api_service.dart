@@ -1,20 +1,13 @@
+import 'package:pulse_ev/core/network/api_client.dart';
 import 'package:pulse_ev/features/dashboard/models/dashboard_model.dart';
 
 class DashboardApiService {
-  Future<DashboardModel> getDashboardData() async {
-    await Future.delayed(const Duration(milliseconds: 600));
+  final ApiClient _apiClient;
 
-    return DashboardModel(
-      vehicleName: "Ambulance A-12",
-      vehicleId: "A-12",
-      vehicleStatus: "AVAILABLE",
-      station: "Central Station",
-      trafficDensity: "Medium",
-      nearbyIncidents: 2,
-      recentMissions: [
-        RecentMission(from: "Station", to: "City Hospital", durationMinutes: 12),
-        RecentMission(from: "Downtown", to: "Trauma Center", durationMinutes: 9),
-      ],
-    );
+  DashboardApiService(this._apiClient);
+
+  Future<DashboardModel> getDashboardData() async {
+    final response = await _apiClient.get('/driver/dashboard');
+    return DashboardModel.fromJson(response.data as Map<String, dynamic>);
   }
 }

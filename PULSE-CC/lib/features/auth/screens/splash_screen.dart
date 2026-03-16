@@ -34,11 +34,14 @@ class _SplashScreenState extends State<SplashScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // PULSE Logo Custom Painter
-                    Image.asset(
-                      'assets/images/pulse_logo.png',
-                      width: 120,
-                      height: 120,
+                    // PULSE Logo
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: Image.asset(
+                        'assets/images/pulse_logo.png',
+                        width: 120,
+                        height: 120,
+                      ),
                     ),
                     const SizedBox(height: 32),
                     Text(

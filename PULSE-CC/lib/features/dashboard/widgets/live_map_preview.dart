@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
@@ -19,27 +20,52 @@ class LiveMapPreview extends StatelessWidget {
           height: 180,
           child: Stack(
             children: [
-              GoogleMap(
-                initialCameraPosition: const CameraPosition(
-                  target: LatLng(18.5204, 73.8567),
-                  zoom: 13.0,
+              FlutterMap(
+                options: const MapOptions(
+                  initialCenter: LatLng(22.7196, 75.8577),
+                  initialZoom: 13.0,
+                  interactionOptions: InteractionOptions(
+                    flags: InteractiveFlag.none,
+                  ),
                 ),
-                liteModeEnabled: true,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                mapToolbarEnabled: false,
-                markers: {
-                  Marker(
-                    markerId: const MarkerId('ambulance'),
-                    position: const LatLng(18.5250, 73.8560),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.pulse.ta',
                   ),
-                  Marker(
-                    markerId: const MarkerId('incident'),
-                    position: const LatLng(18.5200, 73.8580),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: const LatLng(22.7236, 75.8798),
+                        width: 32,
+                        height: 32,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+                          ),
+                          child: const Icon(Icons.local_hospital, color: Colors.white, size: 16),
+                        ),
+                      ),
+                      Marker(
+                        point: const LatLng(22.7185, 75.8571),
+                        width: 32,
+                        height: 32,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+                          ),
+                          child: const Icon(Icons.warning, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ],
                   ),
-                },
+                ],
               ),
               Positioned(
                 bottom: 0,

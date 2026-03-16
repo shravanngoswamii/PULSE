@@ -1,31 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../data/models/intersection.dart';
 
 class SignalMarker {
   static Marker create(Intersection intersection, {required VoidCallback onTap}) {
     return Marker(
-      markerId: MarkerId('signal_${intersection.id}'),
-      position: LatLng(intersection.lat, intersection.lng),
-      onTap: onTap,
-      icon: BitmapDescriptor.defaultMarkerWithHue(
-        _getMarkerHue(intersection.currentPhase, intersection.signalMode),
+      point: LatLng(intersection.lat, intersection.lng),
+      width: 32,
+      height: 32,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: _getMarkerColor(intersection.currentPhase, intersection.signalMode),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: const [
+              BoxShadow(color: Colors.black26, blurRadius: 3, offset: Offset(0, 1)),
+            ],
+          ),
+          child: const Icon(Icons.traffic, color: Colors.white, size: 16),
+        ),
       ),
     );
   }
 
-  static double _getMarkerHue(SignalPhase phase, SignalMode mode) {
-    if (mode == SignalMode.emergency) return BitmapDescriptor.hueGreen;
+  static Color _getMarkerColor(SignalPhase phase, SignalMode mode) {
+    if (mode == SignalMode.emergency) return Colors.green;
 
     switch (phase) {
       case SignalPhase.green:
-        return BitmapDescriptor.hueGreen;
+        return Colors.green;
       case SignalPhase.red:
-        return BitmapDescriptor.hueRed;
+        return Colors.red;
       case SignalPhase.amber:
-        return BitmapDescriptor.hueYellow;
+        return Colors.amber;
       default:
-        return BitmapDescriptor.hueRed;
+        return Colors.red;
     }
   }
 }

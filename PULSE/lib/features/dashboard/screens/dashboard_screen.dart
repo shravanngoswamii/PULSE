@@ -18,17 +18,10 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: const Icon(Icons.menu, color: AppColors.textPrimary),
         title: Text(
           'Home Dashboard',
           style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: AppColors.textPrimary),
-            onPressed: () {},
-          ),
-        ],
         centerTitle: true,
       ),
       body: dashboardAsync.when(
@@ -88,24 +81,10 @@ class DashboardScreen extends ConsumerWidget {
                       onPressed: () => context.go('/mission/setup'),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppButton(
-                            text: 'ANALYSIS',
-                            variant: ButtonVariant.primary,
-                            onPressed: () => context.push('/traffic/intelligence'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: AppButton(
-                            text: 'SIMULATOR',
-                            variant: ButtonVariant.secondary,
-                            onPressed: () => context.push('/simulation'),
-                          ),
-                        ),
-                      ],
+                    AppButton(
+                      text: 'VIEW MAP',
+                      variant: ButtonVariant.primary,
+                      onPressed: () => context.go('/mission/active'),
                     ),
                   ],
                 ),
@@ -127,24 +106,6 @@ class DashboardScreen extends ConsumerWidget {
                       'Nearby Incidents: ${data.nearbyIncidents}',
                       style: AppTextStyles.label,
                     ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () => context.push('/traffic/intelligence'),
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'VIEW TRAFFIC INTELLIGENCE',
-                            style: AppTextStyles.micro.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -163,7 +124,7 @@ class DashboardScreen extends ConsumerWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('${mission.from} → ${mission.to}', style: AppTextStyles.label),
+                                Text('${mission.from} -> ${mission.to}', style: AppTextStyles.label),
                                 Text('Duration: ${mission.durationMinutes} min', style: AppTextStyles.micro),
                               ],
                             ),
@@ -190,21 +151,17 @@ class DashboardScreen extends ConsumerWidget {
               context.go('/dashboard');
               break;
             case 1:
-              context.push('/mission/active');
+              context.push('/mission/setup');
               break;
             case 2:
-              context.push('/traffic/intelligence');
-              break;
-            case 3:
-              context.push('/settings');
+              context.push('/mission/active');
               break;
           }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.rocket_launch), label: 'Mission'),
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-          BottomNavigationBarItem(icon: Icon(Icons.traffic), label: 'Traffic'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
     );

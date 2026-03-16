@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start chrome:*)",
+      "Bash(find:*)",
+      "Bash(cd:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(python:*)",
+      "Bash(pkill:*)",
+      "Bash(npx vite:*)",
+      "Bash(curl:*)"
+    ]
+  }
+}

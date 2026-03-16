@@ -1,83 +1,168 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pulse_ev/features/settings/providers/settings_provider.dart';
+import 'package:pulse_ev/core/network/api_client.dart';
+import 'package:pulse_ev/core/services/location_service.dart';
+import 'package:pulse_ev/core/storage/token_storage.dart';
+import 'package:pulse_ev/features/auth/providers/user_provider.dart';
 import 'package:pulse_ev/features/mission/models/hospital_model.dart';
 import 'package:pulse_ev/features/mission/models/mission_model.dart';
 import 'package:pulse_ev/features/mission/repositories/mission_repository.dart';
 import 'package:pulse_ev/features/mission/services/mission_api_service.dart';
 
 // Providers
-final missionApiServiceProvider = Provider<MissionApiService>((ref) => MissionApiService());
+final apiClientProvider = Provider<ApiClient>((ref) {
+  final tokenStorage = ref.watch(tokenStorageProvider);
+  return ApiClient(tokenStorage: tokenStorage);
+});
+
+final missionApiServiceProvider = Provider<MissionApiService>((ref) {
+  final apiClient = ref.watch(apiClientProvider);
+  return MissionApiService(apiClient);
+});
 
 final missionRepositoryProvider = Provider<MissionRepository>((ref) {
   final apiService = ref.watch(missionApiServiceProvider);
   return MissionRepository(apiService);
 });
 
-final hospitalsProvider = FutureProvider<List<HospitalModel>>((ref) async {
-  final repository = ref.watch(missionRepositoryProvider);
-  return await repository.getHospitals();
-});
+final hospitalsProvider = FutureProvider.family<List<HospitalModel>, ({double lat, double lng})>(
+  (ref, coords) async {
+    final repository = ref.watch(missionRepositoryProvider);
+    return await repository.getHospitals(coords.lat, coords.lng);
+  },
+);
 
 // Mission State Notifier
 class MissionNotifier extends StateNotifier<MissionModel?> {
   final MissionRepository _repository;
   final Ref _ref;
-  Timer? _progressTimer;
+  StreamSubscription? _gpsSubscription;
+  Timer? _pingTimer;
 
   MissionNotifier(this._repository, this._ref) : super(null);
 
-  Future<void> startMission(String type, String priority, HospitalModel hospital) async {
-    final mission = await _repository.startMission(type, priority, hospital);
-    state = mission;
-    _startSimulation();
+  Future<void> startMission({
+    required String incidentType,
+    required String priority,
+    required HospitalModel hospital,
+    required double originLat,
+    required double originLng,
+  }) async {
+    final user = _ref.read(currentUserProvider);
+    final vehicleId = user?.vehicleId ?? '';
+
+    final response = await _repository.startMission(
+      vehicleId: vehicleId,
+      destLat: hospital.lat,
+      destLng: hospital.lng,
+      destName: hospital.name,
+      incidentType: incidentType,
+      priority: priority,
+      originLat: originLat,
+      originLng: originLng,
+    );
+
+    final missionId = (response['mission_id'] ?? response['id'] ?? '').toString();
+    final routeCoords = <List<double>>[];
+    final rawCoords = response['route_coordinates'] as List?;
+    if (rawCoords != null) {
+      for (final coord in rawCoords) {
+        if (coord is Map) {
+          final lat = (coord['lat'] as num?)?.toDouble();
+          final lng = (coord['lng'] as num?)?.toDouble();
+          if (lat != null && lng != null) {
+            routeCoords.add([lat, lng]);
+          }
+        } else if (coord is List) {
+          routeCoords.add(coord.map((e) => (e as num).toDouble()).toList());
+        }
+      }
+    }
+
+    final distanceKm = (response['distance_km'] as num?)?.toDouble() ?? hospital.distanceKm;
+    final etaMin = (response['eta_minutes'] as num?)?.toDouble() ?? hospital.etaMinutes;
+
+    state = MissionModel(
+      missionId: missionId,
+      incidentType: incidentType,
+      priorityLevel: priority,
+      destinationHospital: hospital,
+      distance: distanceKm,
+      eta: '${etaMin.toInt()} min',
+      signalsCleared: 0,
+      status: MissionStatus.active,
+      routeCoordinates: routeCoords,
+    );
+
+    _startGpsTracking(missionId);
   }
 
-  void _startSimulation() {
-    _progressTimer?.cancel();
-    _progressTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+  void _startGpsTracking(String missionId) {
+    _stopGpsTracking();
+
+    // Ping GPS every 5 seconds
+    _pingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (state == null || state!.status != MissionStatus.active) {
-        timer.cancel();
+        _stopGpsTracking();
         return;
       }
-
-      final currentDistance = state!.distance;
-      if (currentDistance <= 0.1) {
-        state = state!.copyWith(
-          distance: 0.0,
-          eta: "0 min",
-          status: MissionStatus.completed,
-        );
-        timer.cancel();
-        return;
+      try {
+        final position = await LocationService.getCurrentPosition();
+        if (position != null) {
+          final response = await _repository.pingGPS(missionId, position.latitude, position.longitude);
+          // Update mission state from ping response
+          if (state != null && response.isNotEmpty) {
+            final updatedEta = (response['eta_minutes'] as num?)?.toDouble();
+            final updatedDistance = (response['distance_km'] as num?)?.toDouble();
+            final updatedSignals = response['signals_cleared'] as int?;
+            final rawCoords = response['route_coordinates'] as List?;
+            List<List<double>>? updatedRoute;
+            if (rawCoords != null) {
+              updatedRoute = <List<double>>[];
+              for (final coord in rawCoords) {
+                if (coord is Map) {
+                  final lat = (coord['lat'] as num?)?.toDouble();
+                  final lng = (coord['lng'] as num?)?.toDouble();
+                  if (lat != null && lng != null) {
+                    updatedRoute.add([lat, lng]);
+                  }
+                } else if (coord is List) {
+                  updatedRoute.add(coord.map((e) => (e as num).toDouble()).toList());
+                }
+              }
+            }
+            state = state!.copyWith(
+              eta: updatedEta != null ? '${updatedEta.toInt()} min' : null,
+              distance: updatedDistance,
+              signalsCleared: updatedSignals,
+              routeCoordinates: updatedRoute,
+            );
+          }
+        }
+      } catch (_) {
+        // Silently handle ping failures
       }
-
-      // Simulate progress
-      final newDistance = (currentDistance - 0.2).clamp(0.0, double.infinity);
-      final newEta = "${(newDistance * 2).toInt() + 1} min";
-      
-      final settings = _ref.read(settingsProvider);
-      final signalsClearedIncrement = (settings.autoSignalOverride && timer.tick % 3 == 0) ? 1 : 0;
-
-      state = state!.copyWith(
-        distance: newDistance,
-        eta: newEta,
-        signalsCleared: state!.signalsCleared + signalsClearedIncrement,
-      );
     });
+  }
+
+  void _stopGpsTracking() {
+    _gpsSubscription?.cancel();
+    _gpsSubscription = null;
+    _pingTimer?.cancel();
+    _pingTimer = null;
   }
 
   Future<void> endMission() async {
     if (state != null) {
       await _repository.endMission(state!.missionId);
-      _progressTimer?.cancel();
-      state = null;
+      _stopGpsTracking();
+      state = state!.copyWith(status: MissionStatus.completed);
     }
   }
 
   @override
   void dispose() {
-    _progressTimer?.cancel();
+    _stopGpsTracking();
     super.dispose();
   }
 }

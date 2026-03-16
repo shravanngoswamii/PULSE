@@ -1,25 +1,40 @@
 class HospitalModel {
+  final String id;
   final String name;
-  final double distance;
-  final String eta;
-  final List<double> coordinates;
-  final int signalsToOverride;
+  final double lat;
+  final double lng;
+  final String? address;
+  final String? phone;
+  final double distanceKm;
+  final double etaMinutes;
 
   HospitalModel({
+    required this.id,
     required this.name,
-    required this.distance,
-    required this.eta,
-    required this.coordinates,
-    required this.signalsToOverride,
+    required this.lat,
+    required this.lng,
+    this.address,
+    this.phone,
+    required this.distanceKm,
+    required this.etaMinutes,
   });
 
   factory HospitalModel.fromJson(Map<String, dynamic> json) {
     return HospitalModel(
-      name: json['name'] as String,
-      distance: (json['distance'] as num).toDouble(),
-      eta: json['eta'] as String,
-      coordinates: (json['coordinates'] as List).map((e) => (e as num).toDouble()).toList(),
-      signalsToOverride: json['signalsToOverride'] as int,
+      id: (json['id'] ?? '').toString(),
+      name: json['name'] as String? ?? '',
+      lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
+      lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
+      address: json['address'] as String?,
+      phone: json['phone'] as String?,
+      distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 0.0,
+      etaMinutes: (json['eta_minutes'] as num?)?.toDouble() ?? 0.0,
     );
   }
+
+  /// Formatted ETA string for display
+  String get eta => '${etaMinutes.toInt()} min';
+
+  /// Alias for backward compatibility
+  double get distance => distanceKm;
 }

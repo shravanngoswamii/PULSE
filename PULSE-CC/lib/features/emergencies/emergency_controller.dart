@@ -4,8 +4,6 @@ import '../../data/models/traffic_alert.dart';
 import '../../data/models/emergency_vehicle.dart';
 import '../../data/repositories/mission_repository.dart';
 import '../../data/repositories/alert_repository.dart';
-// import '../../data/repositories/mock_mission_repository.dart';
-// import '../../data/repositories/mock_alert_repository.dart';
 
 class EmergencyState {
   final List<ActiveMission> activeMissions;
@@ -66,9 +64,13 @@ class EmergencyController extends StateNotifier<EmergencyState> {
     try {
       final missions = await _missionRepo.getActiveMissions();
       final alerts = await _alertRepo.getAlerts();
-      
-      final ambulanceMissions = missions.where((m) => m.vehicle.type == VehicleType.ambulance).toList();
-      final primary = ambulanceMissions.isNotEmpty ? ambulanceMissions.first : (missions.isNotEmpty ? missions.first : null);
+
+      final ambulanceMissions = missions
+          .where((m) => m.vehicle.type == VehicleType.ambulance)
+          .toList();
+      final primary = ambulanceMissions.isNotEmpty
+          ? ambulanceMissions.first
+          : (missions.isNotEmpty ? missions.first : null);
 
       state = state.copyWith(
         activeMissions: missions,
@@ -88,9 +90,15 @@ class EmergencyController extends StateNotifier<EmergencyState> {
     state = state.copyWith(activeFilter: type);
   }
 
-  void clearAlert(String alertId) {
-    final updatedAlerts = state.alerts.where((a) => a.id != alertId).toList();
-    state = state.copyWith(alerts: updatedAlerts);
+  Future<void> clearAlert(String alertId) async {
+    try {
+      await _alertRepo.clearAlert(alertId);
+      final updatedAlerts =
+          state.alerts.where((a) => a.id != alertId).toList();
+      state = state.copyWith(alerts: updatedAlerts);
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to clear alert');
+    }
   }
 
   Future<void> refreshMissions() async {
@@ -99,7 +107,8 @@ class EmergencyController extends StateNotifier<EmergencyState> {
   }
 }
 
-final emergencyControllerProvider = StateNotifierProvider<EmergencyController, EmergencyState>((ref) {
+final emergencyControllerProvider =
+    StateNotifierProvider<EmergencyController, EmergencyState>((ref) {
   final missionRepo = ref.watch(missionRepositoryProvider);
   final alertRepo = ref.watch(alertRepositoryProvider);
   return EmergencyController(missionRepo: missionRepo, alertRepo: alertRepo);

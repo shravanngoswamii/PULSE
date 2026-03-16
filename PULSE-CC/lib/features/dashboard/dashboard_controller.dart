@@ -3,6 +3,8 @@ import '../../data/models/active_mission.dart';
 import '../../data/models/intersection.dart';
 import '../../data/repositories/mission_repository.dart';
 import '../../data/repositories/intersection_repository.dart';
+import '../../data/sources/remote/pulse_api_client.dart';
+import '../../core/constants/api_constants.dart';
 
 class SystemStatus {
   final int activeSignals;
@@ -11,11 +13,21 @@ class SystemStatus {
   final int averageDelaySeconds;
 
   const SystemStatus({
-    this.activeSignals = 128,
-    this.activeEmergencies = 2,
-    this.congestedRoads = 5,
-    this.averageDelaySeconds = 14,
+    this.activeSignals = 0,
+    this.activeEmergencies = 0,
+    this.congestedRoads = 0,
+    this.averageDelaySeconds = 0,
   });
+
+  factory SystemStatus.fromJson(Map<String, dynamic> json) {
+    // Try both camelCase and snake_case keys
+    return SystemStatus(
+      activeSignals: json['activeSignals'] as int? ?? json['active_signals'] as int? ?? 0,
+      activeEmergencies: json['activeEmergencies'] as int? ?? json['active_emergencies'] as int? ?? 0,
+      congestedRoads: json['congestedRoads'] as int? ?? json['congested_roads'] as int? ?? 0,
+      averageDelaySeconds: json['averageDelaySeconds'] as int? ?? json['average_delay_seconds'] as int? ?? 0,
+    );
+  }
 }
 
 class DashboardState {
@@ -53,8 +65,9 @@ class DashboardState {
 class DashboardController extends StateNotifier<DashboardState> {
   final MissionRepository _missionRepo;
   final IntersectionRepository _intersectionRepo;
+  final PulseApiClient _apiClient;
 
-  DashboardController(this._missionRepo, this._intersectionRepo)
+  DashboardController(this._missionRepo, this._intersectionRepo, this._apiClient)
       : super(const DashboardState());
 
   Future<void> initialize() async {
@@ -65,11 +78,19 @@ class DashboardController extends StateNotifier<DashboardState> {
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true);
     try {
-      final missions = await _missionRepo.getActiveMissions();
-      final intersections = await _intersectionRepo.getIntersections();
+      final futures = await Future.wait([
+        _missionRepo.getActiveMissions(),
+        _intersectionRepo.getIntersections(),
+        _fetchSystemStatus(),
+      ]);
+      final missions = futures[0] as List<ActiveMission>;
+      final intersections = futures[1] as List<Intersection>;
+      final status = futures[2] as SystemStatus;
+
       state = state.copyWith(
         activeMissions: missions,
         intersections: intersections,
+        systemStatus: status,
         isLoading: false,
       );
     } catch (e) {
@@ -78,6 +99,19 @@ class DashboardController extends StateNotifier<DashboardState> {
         errorMessage: 'Failed to load dashboard data',
       );
     }
+  }
+
+  Future<SystemStatus> _fetchSystemStatus() async {
+    try {
+      final response = await _apiClient.dio.get(ApiConstants.operatorState);
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        // The stats may be nested under a 'stats' key or at the top level
+        final statsJson = data['stats'] as Map<String, dynamic>? ?? data;
+        return SystemStatus.fromJson(statsJson);
+      }
+    } catch (_) {}
+    return const SystemStatus();
   }
 
   Future<void> forceSignal(String intersectionId, SignalPhase phase) async {
@@ -103,5 +137,6 @@ final dashboardControllerProvider =
     StateNotifierProvider<DashboardController, DashboardState>((ref) {
   final missionRepo = ref.watch(missionRepositoryProvider);
   final intersectionRepo = ref.watch(intersectionRepositoryProvider);
-  return DashboardController(missionRepo, intersectionRepo);
+  final apiClient = ref.watch(apiClientProvider);
+  return DashboardController(missionRepo, intersectionRepo, apiClient);
 });

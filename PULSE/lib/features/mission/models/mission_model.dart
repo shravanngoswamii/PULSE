@@ -11,6 +11,7 @@ class MissionModel {
   final String eta;
   final int signalsCleared;
   final MissionStatus status;
+  final List<List<double>> routeCoordinates;
 
   MissionModel({
     required this.missionId,
@@ -21,6 +22,7 @@ class MissionModel {
     required this.eta,
     required this.signalsCleared,
     required this.status,
+    this.routeCoordinates = const [],
   });
 
   MissionModel copyWith({
@@ -32,6 +34,7 @@ class MissionModel {
     String? eta,
     int? signalsCleared,
     MissionStatus? status,
+    List<List<double>>? routeCoordinates,
   }) {
     return MissionModel(
       missionId: missionId ?? this.missionId,
@@ -42,6 +45,7 @@ class MissionModel {
       eta: eta ?? this.eta,
       signalsCleared: signalsCleared ?? this.signalsCleared,
       status: status ?? this.status,
+      routeCoordinates: routeCoordinates ?? this.routeCoordinates,
     );
   }
 }

@@ -1,38 +1,25 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 class ApiConstants {
   ApiConstants._();
 
-  static const String baseUrl = 'https://api.pulse.city/v1';
-  static const String wsUrl = 'wss://api.pulse.city/v1/live';
-  static const String mqttBroker = 'mqtt.pulse.city';
-  static const int mqttPort = 1883;
+  static String get baseUrl =>
+      kIsWeb ? 'http://localhost:9000/api' : 'http://10.0.2.2:9000/api';
+
+  static String get wsUrl =>
+      kIsWeb ? 'ws://localhost:9000/ws/operator' : 'ws://10.0.2.2:9000/ws/operator';
+
   static const Duration requestTimeout = Duration(seconds: 30);
   static const Duration wsReconnectDelay = Duration(seconds: 5);
 
   // Auth
   static const String login = '/auth/login';
-  static const String logout = '/auth/logout';
-  static const String refreshToken = '/auth/refresh';
+  static const String register = '/auth/register';
+  static const String me = '/auth/me';
 
-  // Missions
-  static const String activeMissions = '/missions/active';
-  static const String missionById = '/missions/{id}';
-
-  // Intersections
-  static const String intersections = '/intersections';
-  static const String intersectionById = '/intersections/{id}';
-  static const String forceSignal = '/intersections/{id}/signal';
-  static const String restoreAuto = '/intersections/{id}/restore';
-
-  // Alerts
-  static const String alerts = '/alerts';
-  static const String clearAlert = '/alerts/{id}/clear';
-
-  // Intelligence
-  static const String trafficStats = '/intelligence/stats';
-  static const String districtView = '/intelligence/district/{sector}';
-
-  // Simulation
-  static const String simStart = '/simulation/start';
-  static const String simStop = '/simulation/stop';
-  static const String simReset = '/simulation/reset';
+  // Operator
+  static const String operatorState = '/operator/state';
+  static const String missions = '/operator/missions';
+  static const String intersections = '/operator/intersections';
+  static const String alerts = '/operator/alerts';
 }

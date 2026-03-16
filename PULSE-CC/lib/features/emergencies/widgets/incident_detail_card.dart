@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../data/models/traffic_alert.dart';
@@ -58,21 +59,37 @@ class IncidentDetailCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   child: Stack(
                     children: [
-                      GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: LatLng(alert.lat, alert.lng),
-                          zoom: 15.0,
-                        ),
-                        liteModeEnabled: true,
-                        markers: {
-                          Marker(
-                            markerId: const MarkerId('incident_loc'),
-                            position: LatLng(alert.lat, alert.lng),
+                      FlutterMap(
+                        options: MapOptions(
+                          initialCenter: LatLng(alert.lat, alert.lng),
+                          initialZoom: 15.0,
+                          interactionOptions: const InteractionOptions(
+                            flags: InteractiveFlag.none,
                           ),
-                        },
-                        zoomControlsEnabled: false,
-                        myLocationButtonEnabled: false,
-                        mapToolbarEnabled: false,
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.pulse.ta',
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: LatLng(alert.lat, alert.lng),
+                                width: 24,
+                                height: 24,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                  child: const Icon(Icons.warning, color: Colors.white, size: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                       Positioned(
                         bottom: 0,

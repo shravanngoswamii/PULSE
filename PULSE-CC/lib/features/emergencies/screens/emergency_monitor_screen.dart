@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
@@ -76,36 +77,65 @@ class EmergencyMonitorScreen extends ConsumerWidget {
                   height: 240,
                   child: Stack(
                     children: [
-                      GoogleMap(
-                        initialCameraPosition: const CameraPosition(
-                          target: LatLng(18.5204, 73.8567),
-                          zoom: 14.0,
+                      FlutterMap(
+                        options: const MapOptions(
+                          initialCenter: LatLng(22.7196, 75.8577),
+                          initialZoom: 14.0,
                         ),
-                        markers: {
-                          const Marker(
-                            markerId: MarkerId('ambulance_a12'),
-                            position: LatLng(18.5204, 73.8567),
-                            infoWindow: InfoWindow(title: 'A-12: 5 min'),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.pulse.ta',
                           ),
-                          Marker(
-                            markerId: const MarkerId('incident'),
-                            position: const LatLng(18.5250, 73.8600),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-                          ),
-                        },
-                        polylines: {
-                          const Polyline(
-                            polylineId: PolylineId('route_a12'),
-                            color: AppColors.primary,
-                            width: 5,
-                            points: [
-                              LatLng(18.5150, 73.8500),
-                              LatLng(18.5204, 73.8567),
-                              LatLng(18.5250, 73.8600),
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: const [
+                                  LatLng(22.7134, 75.8621),
+                                  LatLng(22.7196, 75.8577),
+                                  LatLng(22.7299, 75.8656),
+                                ],
+                                color: AppColors.primary,
+                                strokeWidth: 5,
+                              ),
                             ],
                           ),
-                        },
-                        zoomControlsEnabled: false,
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: const LatLng(22.7196, 75.8577),
+                                width: 36,
+                                height: 36,
+                                child: Tooltip(
+                                  message: 'A-12: 5 min',
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                                    ),
+                                    child: const Icon(Icons.local_hospital, color: Colors.white, size: 18),
+                                  ),
+                                ),
+                              ),
+                              Marker(
+                                point: const LatLng(22.7299, 75.8656),
+                                width: 36,
+                                height: 36,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                                  ),
+                                  child: const Icon(Icons.warning, color: Colors.white, size: 18),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                       Positioned(
                         right: 12,

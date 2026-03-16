@@ -7,17 +7,14 @@ import 'package:pulse_ev/features/auth/screens/splash_screen.dart';
 import 'package:pulse_ev/features/dashboard/screens/dashboard_screen.dart';
 import 'package:pulse_ev/features/mission/screens/mission_setup_screen.dart';
 import 'package:pulse_ev/features/mission/screens/mission_summary_screen.dart';
+import 'package:pulse_ev/features/mission/screens/destination_picker_screen.dart';
 import 'package:pulse_ev/features/navigation/screens/live_map_screen.dart';
-import 'package:pulse_ev/features/traffic/screens/traffic_intelligence_screen.dart';
-import 'package:pulse_ev/features/simulation/screens/simulation_screen.dart';
-import 'package:pulse_ev/features/settings/screens/settings_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
   return GoRouter(
     initialLocation: '/splash',
-    refreshListenable: null, // We are watching authState directly in the provider
     redirect: (context, state) {
       final isLoggingIn = state.uri.path == '/login';
       final isSigningUp = state.uri.path == '/signup';
@@ -31,7 +28,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (authState == AuthState.authenticated) {
         if (isLoggingIn || isSigningUp) return '/dashboard';
       }
-
 
       return null;
     },
@@ -57,6 +53,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MissionSetupScreen(),
       ),
       GoRoute(
+        path: '/mission/pick-destination',
+        builder: (context, state) => const DestinationPickerScreen(),
+      ),
+      GoRoute(
         path: '/mission/active',
         builder: (context, state) => const LiveMapScreen(),
       ),
@@ -64,19 +64,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/mission/summary',
         builder: (context, state) => const MissionSummaryScreen(),
       ),
-      GoRoute(
-        path: '/traffic/intelligence',
-        builder: (context, state) => const TrafficIntelligenceScreen(),
-      ),
-      GoRoute(
-        path: '/simulation',
-        builder: (context, state) => const SimulationScreen(),
-      ),
-      GoRoute(
-        path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
-      ),
     ],
   );
 });
-

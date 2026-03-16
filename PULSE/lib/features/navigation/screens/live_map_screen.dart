@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:pulse_ev/config/app_theme.dart';
+import 'package:pulse_ev/core/services/location_service.dart';
 import 'package:pulse_ev/features/mission/providers/mission_provider.dart';
+import 'package:pulse_ev/features/mission/screens/mission_setup_screen.dart';
 import 'package:pulse_ev/shared/widgets/app_button.dart';
 import 'package:pulse_ev/shared/widgets/pulse_map.dart';
 
@@ -12,6 +16,141 @@ class LiveMapScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentMission = ref.watch(missionProvider);
+    final positionAsync = ref.watch(currentPositionProvider);
+
+    // Determine current position as LatLng
+    LatLng? currentLatLng;
+    final position = positionAsync.valueOrNull;
+    if (position != null) {
+      currentLatLng = LatLng(position.latitude, position.longitude);
+    }
+
+    // No active mission - show plain map view
+    if (currentMission == null) {
+      return _buildNoMissionView(context, currentLatLng);
+    }
+
+    // Active mission - show full HUD
+    return _buildActiveMissionView(context, ref, currentMission, currentLatLng);
+  }
+
+  Widget _buildNoMissionView(BuildContext context, LatLng? currentLatLng) {
+    final mapCenter = currentLatLng ?? const LatLng(22.7196, 75.8577);
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => context.go('/dashboard'),
+        ),
+        title: Text(
+          'MAP VIEW',
+          style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1),
+        ),
+        centerTitle: true,
+      ),
+      body: Stack(
+        children: [
+          PulseMap(
+            center: mapCenter,
+            currentPosition: currentLatLng,
+          ),
+          // LIVE indicator
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.my_location, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 4),
+                  Text('LIVE', style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+          // START MISSION button at bottom
+          Positioned(
+            bottom: 24,
+            left: 16,
+            right: 16,
+            child: AppButton(
+              text: 'START MISSION',
+              variant: ButtonVariant.primary,
+              onPressed: () => context.go('/mission/setup'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveMissionView(BuildContext context, WidgetRef ref, dynamic currentMission, LatLng? currentLatLng) {
+    // Build route coordinates from mission data
+    final routeCoords = <LatLng>[];
+    for (final coord in currentMission.routeCoordinates) {
+      if (coord.length >= 2) {
+        routeCoords.add(LatLng(coord[0], coord[1]));
+      }
+    }
+
+    // Destination marker
+    final destinationLatLng = LatLng(
+      currentMission.destinationHospital.lat,
+      currentMission.destinationHospital.lng,
+    );
+
+    // Determine map center
+    LatLng? mapCenter = currentLatLng ?? destinationLatLng;
+    if (routeCoords.isNotEmpty) {
+      mapCenter = routeCoords.first;
+    }
+
+    // Build intersection markers along route
+    final intersectionMarkers = <Marker>[];
+    if (routeCoords.length > 2) {
+      // Show small circle markers at each intermediate route coordinate
+      for (int i = 1; i < routeCoords.length - 1; i++) {
+        intersectionMarkers.add(
+          Marker(
+            point: routeCoords[i],
+            width: 12,
+            height: 12,
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.7),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    // Build a thicker green route polyline
+    final routePolylines = <Polyline>[];
+    if (routeCoords.isNotEmpty) {
+      routePolylines.add(
+        Polyline(
+          points: routeCoords,
+          strokeWidth: 6.0,
+          color: AppColors.corridorActive,
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -23,19 +162,19 @@ class LiveMapScreen extends ConsumerWidget {
           'ACTIVE MISSION',
           style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: AppColors.textPrimary),
-            onPressed: () {},
-          ),
-        ],
         centerTitle: true,
       ),
       body: Stack(
         children: [
-          // 1. Map
-          const PulseMap(
-            markers: ['Ambulance', 'Hospital', 'Intersection'],
+          // Map with custom polylines and intersection markers
+          PulseMap(
+            center: mapCenter,
+            currentPosition: currentLatLng,
+            routeCoordinates: const [], // We handle polylines ourselves
+            polylines: routePolylines,
+            mapMarkers: intersectionMarkers,
+            destinationPosition: destinationLatLng,
+            destinationLabel: currentMission.destinationHospital.name,
           ),
 
           // Top Header Layer (HUD)
@@ -67,11 +206,7 @@ class LiveMapScreen extends ConsumerWidget {
                      ],
                    ),
                  ),
-                 IconButton(
-                   icon: const Icon(Icons.layers, color: AppColors.textPrimary),
-                   onPressed: () {},
-                   style: IconButton.styleFrom(backgroundColor: Colors.white),
-                 ),
+                 const SizedBox.shrink(),
               ],
             ),
           ),
@@ -97,31 +232,25 @@ class LiveMapScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 2. Mission Stats Card
+                  // Mission Stats Card
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('[ MISSION PROGRESS ]', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold)),
-                      TextButton.icon(
-                        onPressed: () => context.push('/traffic/intelligence'),
-                        icon: const Icon(Icons.analytics_outlined, size: 14, color: AppColors.primary),
-                        label: Text('TRAFFIC INTEL', style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                      ),
+                      Text('MISSION PROGRESS', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildStatItem('DISTANCE', '${currentMission?.distance.toStringAsFixed(1) ?? "0.0"} km'),
-                      _buildStatItem('SIGNALS', '${currentMission?.signalsCleared ?? 0} Cleared'),
-                      _buildStatItem('ETA', currentMission?.eta ?? '-- min'),
+                      _buildStatItem('DISTANCE', '${currentMission.distance.toStringAsFixed(1)} km'),
+                      _buildStatItem('SIGNALS', '${currentMission.signalsCleared} Cleared'),
+                      _buildStatItem('ETA', currentMission.eta),
                     ],
                   ),
                   const SizedBox(height: 16),
 
-                  // 3. Next Signal Alert
+                  // Destination info
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -136,10 +265,10 @@ class LiveMapScreen extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('[NEXT SIGNAL ALERT]', style: AppTextStyles.micro),
+                              Text('DESTINATION', style: AppTextStyles.micro),
                               const SizedBox(height: 4),
                               Text(
-                                'MG Road Junction',
+                                currentMission.destinationHospital.name,
                                 style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold),
                               ),
                               Text(
@@ -162,9 +291,9 @@ class LiveMapScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
 
-                  // 4. End Mission Button
+                  // End Mission Button
                   AppButton(
-                    text: '[END MISSION]',
+                    text: 'END MISSION',
                     variant: ButtonVariant.emergency,
                     onPressed: () async {
                       await ref.read(missionProvider.notifier).endMission();
