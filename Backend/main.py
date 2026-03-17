@@ -10,12 +10,17 @@ from database import engine, Base, get_db
 from models import Edge, Intersection
 from routers import auth_router, driver_router, operator_router, admin_router, edge_router
 from websocket_manager import manager
+from traffic_simulator import simulator
+from database import SessionLocal
 
 
 @asynccontextmanager
 async def lifespan(app):
     Base.metadata.create_all(bind=engine)
+    # Auto-start traffic simulator
+    await simulator.start(SessionLocal, manager, profile="normal")
     yield
+    await simulator.stop()
 
 
 app = FastAPI(title="PULSE V2I Core Engine", version="2.0", lifespan=lifespan)
@@ -89,12 +94,60 @@ def compare_algorithms(
         return {"error": "Origin and destination snap to the same intersection"}
 
     results = run_all(nodes, graph, start, end)
+    # Include traffic density in comparison results
+    traffic_data = {}
+    for nid in nodes:
+        inter = db.query(Intersection).filter(Intersection.id == nid).first()
+        if inter:
+            traffic_data[nid] = {
+                "congestion": inter.congestion_level,
+                "vehicles_waiting": inter.vehicles_waiting,
+            }
+
     return {
         "start": start, "end": end,
         "start_name": nodes[start]["name"],
         "end_name": nodes[end]["name"],
+        "traffic": traffic_data,
         "results": results,
     }
+
+
+# --- Traffic Simulator API ---
+
+@app.get("/api/traffic/status")
+def get_traffic_status(db: Session = Depends(get_db)):
+    """Get live traffic density for all intersections."""
+    intersections = db.query(Intersection).all()
+    return {
+        "simulator": simulator.get_status(),
+        "intersections": [
+            {"id": i.id, "name": i.name, "lat": i.lat, "lng": i.lng,
+             "congestion": i.congestion_level, "vehicles_waiting": i.vehicles_waiting,
+             "density": simulator.densities.get(i.id, 0),
+             "counts": simulator.vehicle_counts.get(i.id, {})}
+            for i in intersections
+        ],
+    }
+
+
+@app.post("/api/traffic/simulator/{action}")
+async def control_simulator(action: str, profile: str = "normal", node_id: str = None):
+    """Control the traffic simulator: start, stop, profile, hotspot."""
+    if action == "start":
+        if not simulator.running:
+            await simulator.start(SessionLocal, manager, profile)
+        return {"status": "started", "profile": profile}
+    elif action == "stop":
+        await simulator.stop()
+        return {"status": "stopped"}
+    elif action == "profile":
+        simulator.set_profile(profile)
+        return {"status": "profile_changed", "profile": profile}
+    elif action == "hotspot":
+        simulator.set_hotspot(node_id)
+        return {"status": "hotspot_set", "node_id": node_id}
+    return {"error": "Unknown action. Use: start, stop, profile, hotspot"}
 
 
 # --- WebSocket Endpoints ---

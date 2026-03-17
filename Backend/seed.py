@@ -1,6 +1,5 @@
-"""Seed the database with Indore intersections, edges, vehicles, hospitals, and demo users."""
-import sys
-import os
+"""Seed the database – uses real OpenStreetMap intersections (with curated fallback)."""
+import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from database import engine, SessionLocal, Base
@@ -9,57 +8,120 @@ from auth import hash_password
 from graph_engine import haversine
 
 
+# ── Curated fallback: 30 real Indore intersections ──────────────────
+FALLBACK_INTERSECTIONS = [
+    ("INT-001", "Vijay Nagar Square", "Vijay Nagar", 22.7533, 75.8937),
+    ("INT-002", "Palasia Square", "Palasia", 22.7236, 75.8798),
+    ("INT-003", "Geeta Bhawan Square", "Geeta Bhawan", 22.7196, 75.8577),
+    ("INT-004", "Rajwada Square", "Rajwada", 22.7185, 75.8571),
+    ("INT-005", "Sarwate Bus Stand", "Sarwate", 22.7134, 75.8621),
+    ("INT-006", "MG Road Junction", "MG Road", 22.7271, 75.8835),
+    ("INT-007", "Bhanwar Kuwa Square", "Bhanwar Kuwa", 22.7299, 75.8656),
+    ("INT-008", "Scheme 54 Square", "Scheme 54", 22.7386, 75.8897),
+    ("INT-009", "AB Road – MR10 Junction", "AB Road", 22.7453, 75.8822),
+    ("INT-010", "Bombay Hospital Chouraha", "Ring Road", 22.7515, 75.8770),
+    ("INT-011", "Rau–Pithampur Rd Junction", "Rau", 22.6654, 75.8672),
+    ("INT-012", "Mhow Naka Square", "Mhow Naka", 22.6963, 75.8563),
+    ("INT-013", "Sapna Sangeeta Road", "Sapna Sangeeta", 22.7267, 75.8892),
+    ("INT-014", "Race Course Road", "Race Course", 22.7281, 75.8755),
+    ("INT-015", "Navlakha Square", "Navlakha", 22.7244, 75.8708),
+    ("INT-016", "GPO Square", "GPO", 22.7192, 75.8623),
+    ("INT-017", "High Court Chouraha", "High Court", 22.7355, 75.8655),
+    ("INT-018", "Tejaji Nagar Square", "Tejaji Nagar", 22.7485, 75.9010),
+    ("INT-019", "LIG Square", "LIG Colony", 22.7295, 75.8825),
+    ("INT-020", "Panchsheel Nagar", "Panchsheel", 22.7570, 75.8900),
+    ("INT-021", "Bhawarkuan Square", "Bhawarkuan", 22.7120, 75.8680),
+    ("INT-022", "MR9 Road Junction", "MR9", 22.7400, 75.9050),
+    ("INT-023", "Annapurna Road Junction", "Annapurna", 22.7310, 75.8530),
+    ("INT-024", "Mahalaxmi Nagar", "Mahalaxmi", 22.7333, 75.8975),
+    ("INT-025", "Sudama Nagar Chouraha", "Sudama Nagar", 22.7105, 75.8530),
+    ("INT-026", "Silicon City Junction", "Silicon City", 22.7580, 75.9100),
+    ("INT-027", "Nandlalpura Square", "Nandlalpura", 22.7148, 75.8700),
+    ("INT-028", "Old Palasia Crossing", "Old Palasia", 22.7220, 75.8755),
+    ("INT-029", "Laxmi Bai Nagar", "Laxmi Bai Nagar", 22.7055, 75.8580),
+    ("INT-030", "Ring Road–AB Road Flyover", "Ring Road", 22.7490, 75.8850),
+]
+
+FALLBACK_EDGES = [
+    ("INT-001", "INT-008", 120), ("INT-001", "INT-009", 90), ("INT-001", "INT-010", 100),
+    ("INT-001", "INT-018", 130), ("INT-001", "INT-020", 110),
+    ("INT-008", "INT-002", 150), ("INT-008", "INT-006", 80), ("INT-008", "INT-024", 90),
+    ("INT-008", "INT-022", 100),
+    ("INT-009", "INT-010", 60), ("INT-009", "INT-007", 120), ("INT-009", "INT-030", 50),
+    ("INT-002", "INT-006", 60), ("INT-002", "INT-003", 90), ("INT-002", "INT-013", 55),
+    ("INT-002", "INT-028", 40),
+    ("INT-006", "INT-007", 70), ("INT-006", "INT-019", 30), ("INT-006", "INT-014", 50),
+    ("INT-006", "INT-013", 45),
+    ("INT-007", "INT-003", 80), ("INT-007", "INT-004", 60), ("INT-007", "INT-017", 70),
+    ("INT-007", "INT-015", 55), ("INT-007", "INT-014", 60),
+    ("INT-003", "INT-004", 45), ("INT-003", "INT-016", 40),
+    ("INT-004", "INT-005", 50), ("INT-004", "INT-016", 35),
+    ("INT-005", "INT-012", 120), ("INT-005", "INT-021", 50), ("INT-005", "INT-027", 40),
+    ("INT-005", "INT-025", 55), ("INT-005", "INT-029", 60),
+    ("INT-012", "INT-011", 240), ("INT-012", "INT-029", 100),
+    ("INT-010", "INT-007", 150), ("INT-010", "INT-030", 40), ("INT-010", "INT-020", 90),
+    ("INT-013", "INT-019", 40),
+    ("INT-014", "INT-015", 50), ("INT-014", "INT-028", 45),
+    ("INT-015", "INT-016", 55), ("INT-015", "INT-023", 70),
+    ("INT-016", "INT-021", 50),
+    ("INT-017", "INT-009", 85), ("INT-017", "INT-023", 65),
+    ("INT-018", "INT-022", 80), ("INT-018", "INT-026", 120),
+    ("INT-020", "INT-026", 100), ("INT-020", "INT-030", 60),
+    ("INT-021", "INT-027", 45), ("INT-021", "INT-025", 50),
+    ("INT-022", "INT-024", 70),
+    ("INT-023", "INT-003", 85),
+    ("INT-024", "INT-013", 80),
+    ("INT-027", "INT-028", 55),
+    ("INT-028", "INT-003", 70),
+]
+
+
 def seed():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
-    # --- Intersections (Indore, MP) ---
-    intersections = [
-        Intersection(id="INT-VJY", name="Vijay Nagar Square", district="Vijay Nagar", lat=22.7533, lng=75.8937),
-        Intersection(id="INT-PAL", name="Palasia Square", district="Palasia", lat=22.7236, lng=75.8798),
-        Intersection(id="INT-GPR", name="Geeta Bhawan Square", district="Geeta Bhawan", lat=22.7196, lng=75.8577),
-        Intersection(id="INT-RJW", name="Rajwada Square", district="Rajwada", lat=22.7185, lng=75.8571),
-        Intersection(id="INT-SRV", name="Sarwate Bus Stand", district="Sarwate", lat=22.7134, lng=75.8621),
-        Intersection(id="INT-MGL", name="MG Road - LIG Square", district="MG Road", lat=22.7271, lng=75.8835),
-        Intersection(id="INT-BHW", name="Bhanwar Kuwa Square", district="Bhanwar Kuwa", lat=22.7299, lng=75.8656),
-        Intersection(id="INT-SCH", name="Scheme No 54 Square", district="Scheme 54", lat=22.7386, lng=75.8897),
-        Intersection(id="INT-ABR", name="AB Road - MR 10 Junction", district="AB Road", lat=22.7453, lng=75.8822),
-        Intersection(id="INT-BMB", name="Bombay Hospital Chouraha", district="Ring Road", lat=22.7515, lng=75.8770),
-        Intersection(id="INT-RPR", name="Rau-Pithampur Road Junction", district="Rau", lat=22.6654, lng=75.8672),
-        Intersection(id="INT-MHW", name="Mhow Naka Square", district="Mhow Naka", lat=22.6963, lng=75.8563),
-    ]
-    db.add_all(intersections)
-    db.flush()
+    # ── Try OSM first, fall back to curated ─────────────────────────
+    osm_nodes, osm_edges = {}, []
+    try:
+        from osm_graph import load_graph
+        osm_nodes, osm_edges = load_graph()
+    except Exception as e:
+        print(f"OSM graph unavailable: {e}")
 
-    # --- Edges (bidirectional roads with travel times in seconds) ---
-    road_segments = [
-        ("INT-VJY", "INT-SCH", 120),   # Vijay Nagar -> Scheme 54
-        ("INT-VJY", "INT-ABR", 90),    # Vijay Nagar -> AB Road
-        ("INT-VJY", "INT-BMB", 100),   # Vijay Nagar -> Bombay Hospital
-        ("INT-SCH", "INT-PAL", 150),   # Scheme 54 -> Palasia
-        ("INT-SCH", "INT-MGL", 80),    # Scheme 54 -> MG Road
-        ("INT-ABR", "INT-BMB", 60),    # AB Road -> Bombay Hospital
-        ("INT-ABR", "INT-BHW", 120),   # AB Road -> Bhanwar Kuwa
-        ("INT-PAL", "INT-MGL", 60),    # Palasia -> MG Road
-        ("INT-PAL", "INT-GPR", 90),    # Palasia -> Geeta Bhawan
-        ("INT-MGL", "INT-BHW", 70),    # MG Road -> Bhanwar Kuwa
-        ("INT-BHW", "INT-GPR", 80),    # Bhanwar Kuwa -> Geeta Bhawan
-        ("INT-BHW", "INT-RJW", 60),    # Bhanwar Kuwa -> Rajwada
-        ("INT-GPR", "INT-RJW", 45),    # Geeta Bhawan -> Rajwada
-        ("INT-RJW", "INT-SRV", 50),    # Rajwada -> Sarwate
-        ("INT-SRV", "INT-MHW", 120),   # Sarwate -> Mhow Naka
-        ("INT-MHW", "INT-RPR", 240),   # Mhow Naka -> Rau
-        ("INT-BMB", "INT-BHW", 150),   # Bombay Hospital -> Bhanwar Kuwa
-    ]
+    if osm_nodes and len(osm_nodes) >= 5:
+        print(f"Using OSM intersections: {len(osm_nodes)} nodes, {len(osm_edges)} edges")
+        for nid, info in osm_nodes.items():
+            db.add(Intersection(
+                id=f"OSM-{nid}", name=info["name"],
+                district=info.get("district", "Indore"),
+                lat=info["lat"], lng=info["lng"],
+            ))
+        db.flush()
+        for e in osm_edges:
+            from_id, to_id = f"OSM-{e['from']}", f"OSM-{e['to']}"
+            db.add(Edge(
+                from_id=from_id, to_id=to_id,
+                base_travel_time=e["time_s"], current_weight=e["time_s"],
+                distance_meters=e["dist_m"],
+            ))
+    else:
+        print("Using curated Indore intersections (30 nodes)")
+        for iid, name, district, lat, lng in FALLBACK_INTERSECTIONS:
+            db.add(Intersection(id=iid, name=name, district=district, lat=lat, lng=lng))
+        db.flush()
+        imap = {i[0]: i for i in FALLBACK_INTERSECTIONS}
+        for from_id, to_id, base_time in FALLBACK_EDGES:
+            f, t = imap[from_id], imap[to_id]
+            dist = haversine(f[3], f[4], t[3], t[4])
+            db.add(Edge(from_id=from_id, to_id=to_id,
+                        base_travel_time=base_time, current_weight=base_time,
+                        distance_meters=dist))
+            db.add(Edge(from_id=to_id, to_id=from_id,
+                        base_travel_time=base_time, current_weight=base_time,
+                        distance_meters=dist))
 
-    imap = {i.id: i for i in intersections}
-    for from_id, to_id, base_time in road_segments:
-        dist = haversine(imap[from_id].lat, imap[from_id].lng, imap[to_id].lat, imap[to_id].lng)
-        db.add(Edge(from_id=from_id, to_id=to_id, base_travel_time=base_time, current_weight=base_time, distance_meters=dist))
-        db.add(Edge(from_id=to_id, to_id=from_id, base_travel_time=base_time, current_weight=base_time, distance_meters=dist))
-
-    # --- Vehicles ---
+    # ── Vehicles ────────────────────────────────────────────────────
     vehicles = [
         Vehicle(id="AMB-01", type="ambulance", name="Ambulance Alpha", registration="MP-09-AB-1234", current_lat=22.7196, current_lng=75.8577),
         Vehicle(id="AMB-02", type="ambulance", name="Ambulance Bravo", registration="MP-09-AB-5678", current_lat=22.7533, current_lng=75.8937),
@@ -72,7 +134,7 @@ def seed():
     db.add_all(vehicles)
     db.flush()
 
-    # --- Users ---
+    # ── Users ───────────────────────────────────────────────────────
     users = [
         User(name="Rahul Sharma", email="driver@pulse.com", password_hash=hash_password("password123"), role="driver", phone="+91-9876543210", vehicle_id="AMB-01"),
         User(name="Priya Verma", email="driver2@pulse.com", password_hash=hash_password("password123"), role="driver", phone="+91-9876543211", vehicle_id="FIR-01"),
@@ -88,27 +150,13 @@ def seed():
     db.add_all(users)
     db.flush()
 
-    # --- Assign operators to intersections ---
-    operator_assignments = {
-        "INT-VJY": "op-001",  # Suresh Joshi at Vijay Nagar
-        "INT-PAL": "op-001",  # Suresh Joshi also covers Palasia
-        "INT-GPR": "op-002",  # Neha Gupta at Geeta Bhawan
-        "INT-RJW": "op-002",  # Neha Gupta also covers Rajwada
-        "INT-SRV": "op-003",  # Vikram Singh at Sarwate
-        "INT-MGL": "op-003",  # Vikram Singh also covers MG Road
-        "INT-BHW": "op-004",  # Anita Rao at Bhanwar Kuwa
-        "INT-SCH": "op-004",  # Anita Rao also covers Scheme 54
-        "INT-ABR": "op-005",  # Deepak Mishra at AB Road
-        "INT-BMB": "op-005",  # Deepak Mishra also covers Bombay Hospital
-        "INT-RPR": "op-006",  # Kavita Sharma at Rau
-        "INT-MHW": "op-006",  # Kavita Sharma also covers Mhow Naka
-    }
-    for iid, oid in operator_assignments.items():
-        inter = db.query(Intersection).filter(Intersection.id == iid).first()
-        if inter:
-            inter.assigned_operator_id = oid
+    # Assign operators round-robin to intersections
+    operators = ["op-001", "op-002", "op-003", "op-004", "op-005", "op-006"]
+    all_ints = db.query(Intersection).all()
+    for i, inter in enumerate(all_ints):
+        inter.assigned_operator_id = operators[i % len(operators)]
 
-    # --- Hospitals (real Indore hospitals) ---
+    # ── Hospitals ───────────────────────────────────────────────────
     hospitals = [
         Hospital(name="MY Hospital (Govt)", lat=22.7175, lng=75.8558, address="MY Hospital Road, Indore", phone="+91-731-2527383"),
         Hospital(name="Bombay Hospital Indore", lat=22.7515, lng=75.8770, address="Ring Road, Indore", phone="+91-731-2581111"),
@@ -124,19 +172,14 @@ def seed():
         Hospital(name="Vishesh Hospital", lat=22.7280, lng=75.8570, address="Yeshwant Colony, Indore", phone="+91-731-4066666"),
     ]
     db.add_all(hospitals)
-
     db.commit()
     db.close()
-    print("Database seeded successfully with Indore data!")
-    print(f"  {len(intersections)} intersections")
-    print(f"  {len(road_segments) * 2} edges (bidirectional)")
-    print(f"  {len(vehicles)} vehicles")
-    print(f"  {len(users)} users")
-    print(f"  {len(hospitals)} hospitals")
-    print("\nDemo credentials:")
-    print("  Driver:   driver@pulse.com / password123")
-    print("  Operator: operator@pulse.com / password123")
-    print("  Admin:    admin@pulse.com / password123")
+
+    n_ints = len(osm_nodes) if osm_nodes else len(FALLBACK_INTERSECTIONS)
+    print(f"\n✓ Database seeded successfully!")
+    print(f"  {n_ints} intersections ({'OSM' if osm_nodes else 'curated'})")
+    print(f"  {len(vehicles)} vehicles | {len(users)} users | {len(hospitals)} hospitals")
+    print(f"\nDemo: driver@pulse.com / password123")
 
 
 if __name__ == "__main__":

@@ -501,6 +501,19 @@ ALGORITHMS = {
 }
 
 
+
+def _sanitize(obj):
+    """Replace inf/nan floats with None so JSON serialization doesn't crash."""
+    import math
+    if isinstance(obj, float) and (math.isinf(obj) or math.isnan(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
 def run_all(nodes, graph, start, end):
     """Run all algorithms on the same graph/endpoints and return comparison."""
     import time
@@ -524,6 +537,6 @@ def run_all(nodes, graph, start, end):
             "visited": path_step.get("visited_count", 0),
             "relaxations": path_step.get("relaxations", 0),
             "time_ms": round(elapsed_ms, 2),
-            "steps": steps,
+            "steps": _sanitize(steps),
         }
     return results

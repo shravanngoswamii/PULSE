@@ -228,7 +228,10 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
                 passed += 1
     mission.signals_cleared = max(mission.signals_cleared, passed)
 
-    if distance_km > 0:
+    # Only use new OSRM route if it's valid (not a straight-line fallback)
+    use_new_route = distance_km > 0 and len(road_coords) > 2
+
+    if use_new_route:
         mission.eta_minutes = eta_minutes
         mission.distance_km = distance_km
 
@@ -246,6 +249,13 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
         "mission_id": mission.id,
         "lat": ping.current_lat, "lng": ping.current_lng,
     })
+
+    # If OSRM failed, return coordinates from origin to destination as fallback
+    # (use the original mission's OSRM route, not a straight line)
+    if not use_new_route:
+        viz = live_missions_viz.get(mission.id)
+        if viz and viz.get("road_coordinates"):
+            road_coords = [GPSLocation(lat=c["lat"], lng=c["lng"]) for c in viz["road_coordinates"]]
 
     return RouteResponse(
         mission_id=mission.id,
