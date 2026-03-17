@@ -341,21 +341,22 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
                       AppButton(
                         text: 'START MISSION',
                         variant: ButtonVariant.emergency,
-                        onPressed: () async {
+                        onPressed: () {
                           if (_selectedHospital != null) {
                             final position = ref.read(currentPositionProvider).valueOrNull;
                             final originLat = position?.latitude ?? 0.0;
                             final originLng = position?.longitude ?? 0.0;
 
-                            final router = GoRouter.of(context);
-                            await ref.read(missionProvider.notifier).startMission(
+                            // Fire and forget — startMission sets state immediately,
+                            // API runs in background
+                            ref.read(missionProvider.notifier).startMission(
                               incidentType: _selectedIncident,
                               priority: _selectedPriority,
                               hospital: _selectedHospital!,
                               originLat: originLat,
                               originLng: originLng,
                             );
-                            router.go('/mission/active');
+                            context.go('/mission/active');
                           }
                         },
                       ),
@@ -376,6 +377,25 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
     );
   }
 
+  // Well-known major hospitals in Indore
+  static const _majorHospitalNames = {
+    'MY Hospital',
+    'Bombay Hospital',
+    'CHL Hospital',
+    'Choithram Hospital',
+    'Medanta',
+    'SAIMS',
+    'Aurobindo Hospital',
+    'Apollo',
+    'Gokuldas',
+    'Index Medical',
+  };
+
+  bool _isMajorHospital(String name) {
+    final lower = name.toLowerCase();
+    return _majorHospitalNames.any((n) => lower.contains(n.toLowerCase()));
+  }
+
   Widget _buildHospitalList(AsyncValue<Position?> positionAsync) {
     return positionAsync.when(
       loading: () => const AppLoadingIndicator(),
@@ -394,56 +414,170 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
             final filtered = _searchQuery.isEmpty
                 ? hospitals
                 : hospitals.where((h) => h.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+            // Split into nearby (<= 10km) and major city hospitals
+            final nearby = filtered.where((h) => h.distanceKm <= 10).toList();
+            final major = filtered.where((h) => h.distanceKm > 10 || _isMajorHospital(h.name)).toList();
+            // Avoid duplicates: if a major hospital is already in nearby, remove from major
+            final nearbyIds = nearby.map((h) => h.id).toSet();
+            final deduplicatedMajor = major.where((h) => !nearbyIds.contains(h.id)).toList();
+
             if (_selectedHospital == null && filtered.isNotEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 setState(() => _selectedHospital = filtered.first);
               });
             }
+
             return Column(
-              children: filtered.map((h) {
-                final isSelected = _selectedHospital?.id == h.id;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: InkWell(
-                    onTap: () => setState(() => _selectedHospital = h),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
-                        borderRadius: BorderRadius.circular(8),
-                        color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              h.name,
-                              style: AppTextStyles.label.copyWith(
-                                color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (nearby.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6, top: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.near_me_rounded, size: 12, color: AppColors.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                'NEARBY HOSPITALS',
+                                style: AppTextStyles.micro.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            ],
                           ),
-                          Text(
-                            '${h.distanceKm.toStringAsFixed(1)} km',
-                            style: AppTextStyles.micro.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          if (isSelected) ...[
-                            const SizedBox(width: 6),
-                            const Icon(Icons.check_circle, color: AppColors.primary, size: 16),
-                          ],
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${nearby.length}',
+                          style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              }).toList(),
+                  ...nearby.map((h) => _buildHospitalTile(h)),
+                ],
+                if (deduplicatedMajor.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6, top: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.local_hospital_rounded, size: 12, color: Colors.orange),
+                              const SizedBox(width: 4),
+                              Text(
+                                'MAJOR CITY HOSPITALS',
+                                style: AppTextStyles.micro.copyWith(
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${deduplicatedMajor.length}',
+                          style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ...deduplicatedMajor.map((h) => _buildHospitalTile(h)),
+                ],
+                if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: Text('No hospitals found', style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary)),
+                    ),
+                  ),
+              ],
             );
           },
         );
       },
+    );
+  }
+
+  Widget _buildHospitalTile(HospitalModel h) {
+    final isSelected = _selectedHospital?.id == h.id;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: () => setState(() => _selectedHospital = h),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
+            borderRadius: BorderRadius.circular(8),
+            color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : Colors.white,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      h.name,
+                      style: AppTextStyles.label.copyWith(
+                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (h.address != null)
+                      Text(
+                        h.address!,
+                        style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${h.distanceKm.toStringAsFixed(1)} km',
+                    style: AppTextStyles.micro.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    h.eta,
+                    style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                  ),
+                ],
+              ),
+              if (isSelected) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.check_circle, color: AppColors.primary, size: 16),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

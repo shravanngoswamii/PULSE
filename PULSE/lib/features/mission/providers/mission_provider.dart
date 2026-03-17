@@ -4,6 +4,7 @@ import 'package:pulse_ev/core/network/api_client.dart';
 import 'package:pulse_ev/core/services/location_service.dart';
 import 'package:pulse_ev/core/storage/token_storage.dart';
 import 'package:pulse_ev/features/auth/providers/user_provider.dart';
+import 'package:pulse_ev/features/dashboard/providers/dashboard_provider.dart';
 import 'package:pulse_ev/features/mission/models/hospital_model.dart';
 import 'package:pulse_ev/features/mission/models/mission_model.dart';
 import 'package:pulse_ev/features/mission/repositories/mission_repository.dart';
@@ -86,50 +87,78 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
     final user = _ref.read(currentUserProvider);
     final vehicleId = user?.vehicleId ?? '';
 
-    final response = await _repository.startMission(
-      vehicleId: vehicleId,
-      destLat: hospital.lat,
-      destLng: hospital.lng,
-      destName: hospital.name,
-      incidentType: incidentType,
-      priority: priority,
-      originLat: originLat,
-      originLng: originLng,
-    );
-
-    final missionId = (response['mission_id'] ?? response['id'] ?? '').toString();
-    final routeCoords = <List<double>>[];
-    final rawCoords = response['route_coordinates'] as List?;
-    if (rawCoords != null) {
-      for (final coord in rawCoords) {
-        if (coord is Map) {
-          final lat = (coord['lat'] as num?)?.toDouble();
-          final lng = (coord['lng'] as num?)?.toDouble();
-          if (lat != null && lng != null) {
-            routeCoords.add([lat, lng]);
-          }
-        } else if (coord is List) {
-          routeCoords.add(coord.map((e) => (e as num).toDouble()).toList());
-        }
-      }
-    }
-
-    final distanceKm = (response['distance_km'] as num?)?.toDouble() ?? hospital.distanceKm;
-    final etaMin = (response['eta_minutes'] as num?)?.toDouble() ?? hospital.etaMinutes;
-
+    // Phase 1: Set state IMMEDIATELY so the UI can navigate to the map screen
     state = MissionModel(
-      missionId: missionId,
+      missionId: 'pending',
       incidentType: incidentType,
       priorityLevel: priority,
       destinationHospital: hospital,
-      distance: distanceKm,
-      eta: '${etaMin.toInt()} min',
+      distance: hospital.distanceKm,
+      eta: '${hospital.etaMinutes.toInt()} min',
       signalsCleared: 0,
       status: MissionStatus.active,
-      routeCoordinates: routeCoords,
+      isRouteCalculating: true,
+      showHospitalNotification: true,
     );
 
-    _startGpsTracking(missionId);
+    // Auto-dismiss hospital notification after 8 seconds
+    Future.delayed(const Duration(seconds: 8), () {
+      if (state != null && state!.showHospitalNotification) {
+        state = state!.copyWith(showHospitalNotification: false);
+      }
+    });
+
+    // Phase 2: Fire the API call in the background
+    try {
+      final response = await _repository.startMission(
+        vehicleId: vehicleId,
+        destLat: hospital.lat,
+        destLng: hospital.lng,
+        destName: hospital.name,
+        incidentType: incidentType,
+        priority: priority,
+        originLat: originLat,
+        originLng: originLng,
+      );
+
+      final missionId = (response['mission_id'] ?? response['id'] ?? '').toString();
+      final routeCoords = <List<double>>[];
+      final rawCoords = response['route_coordinates'] as List?;
+      if (rawCoords != null) {
+        for (final coord in rawCoords) {
+          if (coord is Map) {
+            final lat = (coord['lat'] as num?)?.toDouble();
+            final lng = (coord['lng'] as num?)?.toDouble();
+            if (lat != null && lng != null) {
+              routeCoords.add([lat, lng]);
+            }
+          } else if (coord is List) {
+            routeCoords.add(coord.map((e) => (e as num).toDouble()).toList());
+          }
+        }
+      }
+
+      final distanceKm = (response['distance_km'] as num?)?.toDouble() ?? hospital.distanceKm;
+      final etaMin = (response['eta_minutes'] as num?)?.toDouble() ?? hospital.etaMinutes;
+
+      // Only use route if it has enough points to be a real road-following path
+      // (2 points = straight line fallback from OSRM failure)
+      final validRoute = routeCoords.length > 2 ? routeCoords : <List<double>>[];
+
+      // Update state with real route data
+      state = state?.copyWith(
+        missionId: missionId,
+        distance: distanceKm,
+        eta: '${etaMin.toInt()} min',
+        routeCoordinates: validRoute,
+        isRouteCalculating: false,
+      );
+
+      _startGpsTracking(missionId);
+    } catch (e) {
+      // Even if API fails, keep the mission active with estimated data
+      state = state?.copyWith(isRouteCalculating: false);
+    }
   }
 
   void _startGpsTracking(String missionId) {
@@ -152,7 +181,7 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
             final updatedSignals = response['signals_cleared'] as int?;
             final rawCoords = response['route_coordinates'] as List?;
             List<List<double>>? updatedRoute;
-            if (rawCoords != null) {
+            if (rawCoords != null && rawCoords.length > 2) {
               updatedRoute = <List<double>>[];
               for (final coord in rawCoords) {
                 if (coord is Map) {
@@ -165,6 +194,8 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
                   updatedRoute.add(coord.map((e) => (e as num).toDouble()).toList());
                 }
               }
+              // Only use if we got a meaningful number of points
+              if (updatedRoute.length <= 2) updatedRoute = null;
             }
             state = state!.copyWith(
               eta: updatedEta != null ? '${updatedEta.toInt()} min' : null,
@@ -189,9 +220,18 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
 
   Future<void> endMission() async {
     if (state != null) {
-      await _repository.endMission(state!.missionId);
       _stopGpsTracking();
+      // Only call backend if we have a real mission ID (not 'pending')
+      if (state!.missionId != 'pending') {
+        try {
+          await _repository.endMission(state!.missionId);
+        } catch (_) {
+          // Continue even if backend fails — stop mission locally
+        }
+      }
       state = state!.copyWith(status: MissionStatus.completed);
+      // Invalidate dashboard so it refetches with the newly completed mission
+      _ref.invalidate(dashboardProvider);
     }
   }
 

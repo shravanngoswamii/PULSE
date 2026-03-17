@@ -39,32 +39,50 @@ class DashboardModel {
 }
 
 class RecentMission {
+  final String id;
   final String from;
   final String to;
   final int durationMinutes;
   final String? startedAt;
   final String? completedAt;
   final String? status;
+  final String? incidentType;
+  final String? priority;
+  final double? destinationLat;
+  final double? destinationLng;
+  final double? distanceKm;
+  final double? etaMinutes;
+  final int signalsCleared;
+  final String? vehicleName;
 
   RecentMission({
+    required this.id,
     required this.from,
     required this.to,
     required this.durationMinutes,
     this.startedAt,
     this.completedAt,
     this.status,
+    this.incidentType,
+    this.priority,
+    this.destinationLat,
+    this.destinationLng,
+    this.distanceKm,
+    this.etaMinutes,
+    this.signalsCleared = 0,
+    this.vehicleName,
   });
 
   factory RecentMission.fromJson(Map<String, dynamic> json) {
     // Calculate duration from started_at and completed_at if duration not provided
     int duration = json['duration_minutes'] as int? ?? json['durationMinutes'] as int? ?? 0;
     if (duration == 0) {
-      final startedAt = json['started_at'] as String?;
-      final completedAt = json['completed_at'] as String?;
-      if (startedAt != null && completedAt != null) {
+      final startedStr = json['started_at']?.toString();
+      final completedStr = json['completed_at']?.toString();
+      if (startedStr != null && completedStr != null) {
         try {
-          final start = DateTime.parse(startedAt);
-          final end = DateTime.parse(completedAt);
+          final start = DateTime.parse(startedStr);
+          final end = DateTime.parse(completedStr);
           duration = end.difference(start).inMinutes;
         } catch (_) {}
       }
@@ -85,12 +103,21 @@ class RecentMission {
         ?? 'Current Location';
 
     return RecentMission(
+      id: (json['id'] ?? '').toString(),
       from: from,
       to: to,
       durationMinutes: duration,
-      startedAt: json['started_at'] as String?,
-      completedAt: json['completed_at'] as String?,
+      startedAt: json['started_at']?.toString(),
+      completedAt: json['completed_at']?.toString(),
       status: json['status'] as String?,
+      incidentType: json['incident_type'] as String?,
+      priority: json['priority'] as String?,
+      destinationLat: (json['destination_lat'] as num?)?.toDouble(),
+      destinationLng: (json['destination_lng'] as num?)?.toDouble(),
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      etaMinutes: (json['eta_minutes'] as num?)?.toDouble(),
+      signalsCleared: (json['signals_cleared'] as num?)?.toInt() ?? 0,
+      vehicleName: json['vehicle_name'] as String?,
     );
   }
 

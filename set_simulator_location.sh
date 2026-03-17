@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # set_simulator_location.sh
-# Sets the booted iOS Simulator's GPS location to Indore, India.
-# Run this once after launching the simulator, before `flutter run`.
+# Continuously sets the booted iOS Simulator's GPS location to Indore, India.
+# Runs in a loop so the location persists even if the simulator tries to revert.
 #
 # Usage:
 #   chmod +x set_simulator_location.sh   # (first time only)
-#   ./set_simulator_location.sh
+#   ./set_simulator_location.sh           # runs in foreground; Ctrl-C to stop
 # ─────────────────────────────────────────────────────────────────────────────
 
 LAT="22.820567"
 LNG="75.942712"
 CITY="Acropolis Institute (AITR), Indore, India"
+INTERVAL=5   # re-apply every 5 seconds
 
 # Find the first booted simulator UDID
 UDID=$(xcrun simctl list devices booted | grep -E '\(Booted\)' | head -1 | grep -oE '[0-9A-F\-]{36}')
@@ -21,12 +22,17 @@ if [ -z "$UDID" ]; then
   exit 1
 fi
 
-echo "📍  Setting location of simulator $UDID → $CITY ($LAT, $LNG)"
-xcrun simctl location "$UDID" set "$LAT,$LNG"
+echo "📍  Locking simulator $UDID to $CITY ($LAT, $LNG)"
+echo "    Re-applying every ${INTERVAL}s. Press Ctrl-C to stop."
 
-if [ $? -eq 0 ]; then
-  echo "✅  Done! The simulator GPS is now set to $CITY."
-  echo "    Hot-restart the app (press R in the flutter run terminal) to pick up the new location."
-else
-  echo "❌  Failed to set location. Make sure Xcode command-line tools are installed."
-fi
+cleanup() {
+  echo ""
+  echo "🛑  Stopped location simulation."
+  exit 0
+}
+trap cleanup SIGINT SIGTERM
+
+while true; do
+  xcrun simctl location "$UDID" set "$LAT,$LNG" 2>/dev/null
+  sleep "$INTERVAL"
+done

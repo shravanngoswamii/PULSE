@@ -121,9 +121,10 @@ class LiveMapScreen extends ConsumerWidget {
       mapCenter = routeCoords.first;
     }
 
-    // Build route polyline (no dots - OSRM returns hundreds of points)
+    // Build route polyline — only if we have a real road-following route (>2 points)
+    // A 2-point route is just a straight line fallback from OSRM failure
     final routePolylines = <Polyline>[];
-    if (routeCoords.isNotEmpty) {
+    if (routeCoords.length > 2) {
       routePolylines.add(
         Polyline(
           points: routeCoords,
@@ -132,6 +133,9 @@ class LiveMapScreen extends ConsumerWidget {
         ),
       );
     }
+
+    final bool isCalculating = currentMission.isRouteCalculating == true;
+    final bool showNotification = currentMission.showHospitalNotification == true;
 
     return Scaffold(
       body: Stack(
@@ -145,6 +149,7 @@ class LiveMapScreen extends ConsumerWidget {
             destinationLabel: currentMission.destinationHospital.name,
           ),
 
+          // Top bar with back, status badges
           Positioned(
             top: 0,
             left: 0,
@@ -152,49 +157,63 @@ class LiveMapScreen extends ConsumerWidget {
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
+                child: Column(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.go('/dashboard'),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: AppShadows.elevated,
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => context.go('/dashboard'),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: AppShadows.elevated,
+                            ),
+                            child: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary, size: 20),
+                          ),
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary, size: 20),
-                      ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: AppShadows.card,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.emergency, shape: BoxShape.circle)),
+                              const SizedBox(width: 6),
+                              Text('ACTIVE', style: AppTextStyles.caption.copyWith(color: AppColors.emergency, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: AppShadows.card,
+                          ),
+                          child: Text(
+                            '${currentMission.signalsCleared} signals',
+                            style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
                     ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: AppShadows.card,
+
+                    // Hospital notification banner
+                    if (showNotification)
+                      _HospitalNotificationBanner(
+                        hospitalName: currentMission.destinationHospital.name,
                       ),
-                      child: Row(
-                        children: [
-                          Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.emergency, shape: BoxShape.circle)),
-                          const SizedBox(width: 6),
-                          Text('ACTIVE', style: AppTextStyles.caption.copyWith(color: AppColors.emergency, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: AppShadows.card,
-                      ),
-                      child: Text(
-                        '${currentMission.signalsCleared} signals',
-                        style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
-                      ),
-                    ),
+
+                    // Route calculating indicator
+                    if (isCalculating)
+                      const _RouteCalculatingBanner(),
                   ],
                 ),
               ),
@@ -352,6 +371,176 @@ class LiveMapScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Animated banner showing "Hospital has been notified of your arrival"
+class _HospitalNotificationBanner extends StatefulWidget {
+  final String hospitalName;
+  const _HospitalNotificationBanner({required this.hospitalName});
+
+  @override
+  State<_HospitalNotificationBanner> createState() => _HospitalNotificationBannerState();
+}
+
+class _HospitalNotificationBannerState extends State<_HospitalNotificationBanner>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Container(
+          margin: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary,
+                AppColors.primary.withValues(alpha: 0.85),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '🏥 ${widget.hospitalName}',
+                      style: AppTextStyles.label.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Hospital notified of your arrival · Start driving',
+                      style: AppTextStyles.micro.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Animated banner showing "Calculating shortest route..."
+class _RouteCalculatingBanner extends StatefulWidget {
+  const _RouteCalculatingBanner();
+
+  @override
+  State<_RouteCalculatingBanner> createState() => _RouteCalculatingBannerState();
+}
+
+class _RouteCalculatingBannerState extends State<_RouteCalculatingBanner>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: AppShadows.card,
+      ),
+      child: Row(
+        children: [
+          FadeTransition(
+            opacity: Tween<double>(begin: 0.3, end: 1.0).animate(_pulseController),
+            child: const Icon(Icons.route_rounded, size: 18, color: AppColors.primary),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'Calculating shortest route...',
+            style: AppTextStyles.label.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.primary,
             ),
           ),
         ],

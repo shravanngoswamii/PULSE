@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:pulse_ev/config/app_theme.dart';
+import 'package:pulse_ev/features/dashboard/models/dashboard_model.dart';
 import 'package:pulse_ev/features/dashboard/providers/dashboard_provider.dart';
 import 'package:pulse_ev/features/mission/screens/mission_setup_screen.dart';
 import 'package:pulse_ev/features/mission/models/mission_model.dart';
@@ -333,7 +334,9 @@ class DashboardScreen extends ConsumerWidget {
                             final isCompleted = mission.status == 'completed';
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 10),
-                              child: Container(
+                              child: GestureDetector(
+                                onTap: () => _showMissionDetail(context, mission),
+                                child: Container(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
@@ -396,12 +399,20 @@ class DashboardScreen extends ConsumerWidget {
                                         ],
                                       ),
                                     ),
-                                    Text(
-                                      mission.timeAgo,
-                                      style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          mission.timeAgo,
+                                          style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textSecondary),
+                                      ],
                                     ),
                                   ],
                                 ),
+                              ),
                               ),
                             );
                           }),
@@ -455,4 +466,159 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
+
+  void _showMissionDetail(BuildContext context, RecentMission mission) {
+    final isCompleted = mission.status == 'completed';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 20),
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: isCompleted ? AppColors.primaryGradient : null,
+                    color: isCompleted ? null : Colors.orange,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isCompleted ? Icons.check_circle_rounded : Icons.pending_rounded,
+                    color: Colors.white, size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mission.to,
+                        style: AppTextStyles.sectionTitle.copyWith(fontSize: 17),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isCompleted ? 'Mission Completed' : (mission.status ?? 'Unknown'),
+                        style: AppTextStyles.micro.copyWith(
+                          color: isCompleted ? AppColors.primary : Colors.orange,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Stats row
+            Row(
+              children: [
+                _buildStatChip(Icons.route_rounded, '${(mission.distanceKm ?? 0).toStringAsFixed(1)} km', 'Distance'),
+                const SizedBox(width: 10),
+                _buildStatChip(Icons.timer_outlined, '${mission.durationMinutes} min', 'Duration'),
+                const SizedBox(width: 10),
+                _buildStatChip(Icons.traffic_rounded, '${mission.signalsCleared}', 'Signals'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Details
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                children: [
+                  if (mission.incidentType != null)
+                    _buildDetailRow('Incident', mission.incidentType!),
+                  if (mission.priority != null)
+                    _buildDetailRow('Priority', mission.priority!),
+                  _buildDetailRow('From', mission.from),
+                  _buildDetailRow('To', mission.to),
+                  if (mission.startedAt != null)
+                    _buildDetailRow('Started', _formatDateTime(mission.startedAt!)),
+                  if (mission.completedAt != null)
+                    _buildDetailRow('Completed', _formatDateTime(mission.completedAt!)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatChip(IconData icon, String value, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: AppColors.primary),
+            const SizedBox(height: 4),
+            Text(value, style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w700, fontSize: 15)),
+            Text(label, style: AppTextStyles.micro),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary)),
+          Flexible(
+            child: Text(
+              value,
+              style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTime(String isoString) {
+    try {
+      final dt = DateTime.parse(isoString).toLocal();
+      final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '${dt.day}/${dt.month}/${dt.year} $h:$min $ampm';
+    } catch (_) {
+      return isoString;
+    }
+  }
 }
+

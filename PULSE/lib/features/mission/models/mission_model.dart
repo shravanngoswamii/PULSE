@@ -12,6 +12,8 @@ class MissionModel {
   final int signalsCleared;
   final MissionStatus status;
   final List<List<double>> routeCoordinates;
+  final bool isRouteCalculating;
+  final bool showHospitalNotification;
 
   MissionModel({
     required this.missionId,
@@ -23,6 +25,8 @@ class MissionModel {
     required this.signalsCleared,
     required this.status,
     this.routeCoordinates = const [],
+    this.isRouteCalculating = false,
+    this.showHospitalNotification = false,
   });
 
   MissionModel copyWith({
@@ -35,6 +39,8 @@ class MissionModel {
     int? signalsCleared,
     MissionStatus? status,
     List<List<double>>? routeCoordinates,
+    bool? isRouteCalculating,
+    bool? showHospitalNotification,
   }) {
     return MissionModel(
       missionId: missionId ?? this.missionId,
@@ -46,6 +52,8 @@ class MissionModel {
       signalsCleared: signalsCleared ?? this.signalsCleared,
       status: status ?? this.status,
       routeCoordinates: routeCoordinates ?? this.routeCoordinates,
+      isRouteCalculating: isRouteCalculating ?? this.isRouteCalculating,
+      showHospitalNotification: showHospitalNotification ?? this.showHospitalNotification,
     );
   }
 }
