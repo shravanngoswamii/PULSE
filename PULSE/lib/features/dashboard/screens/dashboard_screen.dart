@@ -51,12 +51,10 @@ class DashboardScreen extends ConsumerWidget {
                                   width: 36,
                                   height: 36,
                                   decoration: BoxDecoration(
-                                    gradient: AppColors.primaryGradient,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: const Center(
-                                    child: Text('P', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Image.asset('assets/logo.png', fit: BoxFit.cover),
                                 ),
                                 const SizedBox(width: 10),
                                 Text('PULSE', style: AppTextStyles.sectionTitle.copyWith(color: Colors.white, letterSpacing: 2)),
@@ -209,7 +207,7 @@ class DashboardScreen extends ConsumerWidget {
                                     }
                                     return AbsorbPointer(
                                       child: PulseMap(
-                                        center: latLng ?? const LatLng(22.7196, 75.8577),
+                                        center: latLng ?? const LatLng(22.8206, 75.9427),
                                         currentPosition: latLng,
                                         zoom: 14.0,
                                       ),
@@ -310,12 +308,29 @@ class DashboardScreen extends ConsumerWidget {
                         const SizedBox(height: 24),
 
                         if (data.recentMissions.isNotEmpty) ...[
-                          Text(
-                            'RECENT',
-                            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'RECENT MISSIONS',
+                                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, letterSpacing: 1),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '${data.recentMissions.length}',
+                                  style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 10),
                           ...data.recentMissions.map((mission) {
+                            final isCompleted = mission.status == 'completed';
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 10),
                               child: Container(
@@ -330,10 +345,16 @@ class DashboardScreen extends ConsumerWidget {
                                     Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: AppColors.surfaceLight,
+                                        color: isCompleted
+                                            ? AppColors.primary.withValues(alpha: 0.1)
+                                            : Colors.orange.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 18),
+                                      child: Icon(
+                                        isCompleted ? Icons.check_circle_rounded : Icons.local_hospital_rounded,
+                                        color: isCompleted ? AppColors.primary : Colors.orange,
+                                        size: 18,
+                                      ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
@@ -345,10 +366,32 @@ class DashboardScreen extends ConsumerWidget {
                                             style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            mission.durationMinutes > 0 ? '${mission.durationMinutes} min' : 'Completed',
-                                            style: AppTextStyles.micro,
+                                          const SizedBox(height: 3),
+                                          Row(
+                                            children: [
+                                              if (mission.durationMinutes > 0) ...[
+                                                Icon(Icons.timer_outlined, size: 12, color: AppColors.textSecondary),
+                                                const SizedBox(width: 3),
+                                                Text(
+                                                  '${mission.durationMinutes} min',
+                                                  style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary),
+                                                ),
+                                                const SizedBox(width: 10),
+                                              ],
+                                              Icon(
+                                                isCompleted ? Icons.check : Icons.pending_outlined,
+                                                size: 12,
+                                                color: isCompleted ? AppColors.primary : Colors.orange,
+                                              ),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                isCompleted ? 'Completed' : (mission.status ?? 'Unknown'),
+                                                style: AppTextStyles.micro.copyWith(
+                                                  color: isCompleted ? AppColors.primary : Colors.orange,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),

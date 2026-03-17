@@ -9,9 +9,9 @@
 #   ./set_simulator_location.sh
 # ─────────────────────────────────────────────────────────────────────────────
 
-LAT="22.7196"
-LNG="75.8577"
-CITY="Indore, Madhya Pradesh, India"
+LAT="22.820567"
+LNG="75.942712"
+CITY="Acropolis Institute (AITR), Indore, India"
 
 # Find the first booted simulator UDID
 UDID=$(xcrun simctl list devices booted | grep -E '\(Booted\)' | head -1 | grep -oE '[0-9A-F\-]{36}')

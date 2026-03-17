@@ -1,9 +1,9 @@
 import 'package:geolocator/geolocator.dart';
 
-// Default location fallback – Indore, Madhya Pradesh, India
+// Default location fallback – AITR, Indore, India
 // Used when the simulator has no location set or GPS is unavailable.
-const double _kDefaultLat = 22.7196;
-const double _kDefaultLng = 75.8577;
+const double _kDefaultLat = 22.820567;
+const double _kDefaultLng = 75.942712;
 
 class LocationService {
   /// Requests permission (if needed) and returns the current device position.

@@ -163,7 +163,7 @@ body{font-family:'Inter',sans-serif;background:#0a0f1c;color:#E2E8F0;display:fle
         <span><i style="background:#F59E0B"></i>Exploring</span>
         <span><i style="background:#3B82F6"></i>Visited</span>
         <span><i style="background:#7c3aed"></i>Pivot</span>
-        <span><i style="background:#10B981"></i>Path</span>
+        <span><i style="background:#00C853"></i>Path</span>
         <span><i style="background:#EF4444"></i>A/B</span>
       </div>
       <div id="cmpResult"></div>
@@ -187,7 +187,7 @@ let vizMarkers=[],vizEdges=[],roadPl=null;
 let trafficMarkers={},trafficEdges={};
 let simRunning=true;
 
-map=L.map('map',{zoomControl:true}).setView([22.7196,75.8577],13);
+map=L.map('map',{zoomControl:true}).setView([22.8206,75.9427],13);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'PULSE|OSM',maxZoom:18}).addTo(map);
 
 function switchTab(t){
@@ -221,22 +221,23 @@ function congestionColor(level){return level==='high'?'#EF4444':level==='moderat
 function densityColor(d){if(d>15)return '#EF4444';if(d>7)return '#F59E0B';return '#10B981';}
 
 function drawTrafficOverlay(){
-  // Draw base intersection markers
+  // Draw only intersection markers — no edge lines (they're abstract, not roads)
   Object.entries(gN).forEach(([id,n])=>{
     if(trafficMarkers[id])return;
     const m=L.circleMarker([n.lat,n.lng],{radius:5,fillColor:'#10B981',color:'rgba(16,185,129,.3)',weight:1,fillOpacity:.7}).addTo(map);
     m.bindTooltip(`<b>${n.name||id}</b><br><span class="congestion-badge" style="background:#10B981">low</span>`,{direction:'top',offset:[0,-5]});
     trafficMarkers[id]=m;
   });
-  // Draw edges
-  gE.forEach(e=>{
-    const a=gN[e.from_id],b=gN[e.to_id];
-    if(!a||!b)return;
-    const key=e.from_id+'→'+e.to_id;
-    if(trafficEdges[key])return;
-    const l=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'rgba(16,185,129,.2)',weight:1.5,opacity:.6}).addTo(map);
-    trafficEdges[key]=l;
-  });
+}
+// Helper: draw a high-visibility road path with glow
+let glowPl=null;
+function drawHighVisPath(coords,opts){
+  const color=opts?.color||'#00C853';
+  const weight=opts?.weight||6;
+  if(glowPl){map.removeLayer(glowPl);glowPl=null;}
+  glowPl=L.polyline(coords,{color:'#fff',weight:weight+4,opacity:.6}).addTo(map);
+  if(roadPl)map.removeLayer(roadPl);
+  roadPl=L.polyline(coords,{color:color,weight:weight,opacity:.95}).addTo(map);
 }
 
 function updateTrafficVisuals(updates){
@@ -255,13 +256,7 @@ function updateTrafficVisuals(updates){
       m.setStyle({fillColor:col,color:col.replace(')',',0.3)').replace('rgb','rgba'),radius:sz,fillOpacity:.8});
       m.setTooltipContent(`<b>${u.name}</b><br>Density: ${u.density}<br>Vehicles: ${u.vehicles||0}<br><span class="congestion-badge" style="background:${col};color:#fff">${u.congestion}</span>`);
     }
-    // Update edges to this node
-    Object.entries(trafficEdges).forEach(([key,line])=>{
-      if(key.endsWith('→'+u.node_id)){
-        const w=Math.max(1,Math.min(5,1+u.density/8));
-        line.setStyle({color:densityColor(u.density).replace(')',',0.4)').replace('#','rgba(').replace(/([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})/i,(m,r,g,b)=>parseInt(r,16)+','+parseInt(g,16)+','+parseInt(b,16)),weight:w});
-      }
-    });
+    // (edges no longer drawn on map — only intersections)
     const pct=Math.min(100,u.density/30*100);
     const col=densityColor(u.density);
     listHtml.push(`<div class="ti" onclick="map.setView([${u.lat},${u.lng}],16)"><div class="dot" style="background:${col}"></div><div class="name">${u.name}</div><div class="bar"><div class="bar-fill" style="width:${pct}%;background:${col}"></div></div><div class="vc">${u.vehicles||0}</div></div>`);
@@ -327,7 +322,7 @@ function showLiveM(mid){
   const body=document.getElementById('lmb');body.innerHTML='';
   if(d.origin)vizMarkers.push(L.circleMarker([d.origin.lat,d.origin.lng],{radius:10,fillColor:'#EF4444',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindTooltip('START',{permanent:true,direction:'top',offset:[0,-8]}));
   if(d.destination)vizMarkers.push(L.circleMarker([d.destination.lat,d.destination.lng],{radius:10,fillColor:'#3B82F6',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindTooltip(d.destination.name||'END',{permanent:true,direction:'top',offset:[0,-8]}));
-  if(d.road_coordinates&&d.road_coordinates.length>0){const rc=d.road_coordinates.map(c=>[c.lat,c.lng]);if(roadPl)map.removeLayer(roadPl);roadPl=L.polyline(rc,{color:'#10B981',weight:5,opacity:.85}).addTo(map);map.fitBounds(roadPl.getBounds().pad(.15));}
+  if(d.road_coordinates&&d.road_coordinates.length>0){const rc=d.road_coordinates.map(c=>[c.lat,c.lng]);drawHighVisPath(rc);map.fitBounds(roadPl.getBounds().pad(.15));}
   else if(d.origin&&d.destination)map.fitBounds([[d.origin.lat,d.origin.lng],[d.destination.lat,d.destination.lng]],{padding:[50,50],maxZoom:14});
   logSteps(body,d.algo_steps||[],d);
 }
@@ -348,10 +343,10 @@ async function replayLiveM(mid){
     if(s.action==='visit'){const nd=gN[s.node];if(nd){if(!tmpMk[s.node]){tmpMk[s.node]=L.circleMarker([nd.lat,nd.lng],{radius:8,fillColor:'#3B82F6',color:'#1E293B',weight:1,fillOpacity:.8}).addTo(map);vizMarkers.push(tmpMk[s.node]);}else tmpMk[s.node].setStyle({fillColor:'#3B82F6'});}await slp(DELAY);}
     else if(s.action==='relax'){const nt=gN[s.to];if(nt&&(finalPathSet.has(s.from)||finalPathSet.has(s.to))){const nf=gN[s.from];if(nf){const el=L.polyline([[nf.lat,nf.lng],[nt.lat,nt.lng]],{color:'#F59E0B',weight:2,opacity:.4,dashArray:'4 3'}).addTo(map);vizEdges.push(el);}if(!tmpMk[s.to]){tmpMk[s.to]=L.circleMarker([nt.lat,nt.lng],{radius:6,fillColor:'#F59E0B',color:'#1E293B',weight:1,fillOpacity:.6}).addTo(map);vizMarkers.push(tmpMk[s.to]);}}await slp(DELAY/4);}
     else if(s.action==='path'){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];s.path.forEach(n=>pathNodes.add(n));
-      for(let i=0;i<s.path.length-1;i++){const a=gN[s.path[i]],b=gN[s.path[i+1]];if(a&&b){const l=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#10B981',weight:4,opacity:.9}).addTo(map);vizEdges.push(l);}}
+      for(let i=0;i<s.path.length-1;i++){const a=gN[s.path[i]],b=gN[s.path[i+1]];if(a&&b){const l=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#00C853',weight:5,opacity:.9}).addTo(map);vizEdges.push(l);}}
       Object.entries(tmpMk).forEach(([id,m])=>{if(pathNodes.has(id))m.setStyle({fillColor:'#10B981',radius:9});else{map.removeLayer(m);const idx=vizMarkers.indexOf(m);if(idx>=0)vizMarkers.splice(idx,1);}});await slp(DELAY*2);}
   }
-  if(d.road_coordinates&&d.road_coordinates.length>0){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];const rc=d.road_coordinates.map(c=>[c.lat,c.lng]);if(roadPl)map.removeLayer(roadPl);roadPl=L.polyline(rc,{color:'#10B981',weight:5,opacity:.9}).addTo(map);map.fitBounds(roadPl.getBounds().pad(.12));}
+  if(d.road_coordinates&&d.road_coordinates.length>0){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];const rc=d.road_coordinates.map(c=>[c.lat,c.lng]);drawHighVisPath(rc);map.fitBounds(roadPl.getBounds().pad(.12));}
   running=false;
 }
 async function compareLiveM(mid){
@@ -395,10 +390,10 @@ function renderComparison(data,container){
     map.fitBounds(L.latLngBounds([mO.lat,mO.lng],[mD.lat,mD.lng]).pad(0.25),{maxZoom:14});
     vizMarkers.push(L.circleMarker([mO.lat,mO.lng],{radius:10,fillColor:'#EF4444',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindTooltip('START',{permanent:true,direction:'top',offset:[0,-8]}));
     vizMarkers.push(L.circleMarker([mD.lat,mD.lng],{radius:10,fillColor:'#3B82F6',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindTooltip('END',{permanent:true,direction:'top',offset:[0,-8]}));
-    for(let i=0;i<defaultAlgo.path.length-1;i++){const a=gN[defaultAlgo.path[i]],b=gN[defaultAlgo.path[i+1]];if(a&&b){vizEdges.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#10B981',weight:4,opacity:.9}).addTo(map));}}
+    for(let i=0;i<defaultAlgo.path.length-1;i++){const a=gN[defaultAlgo.path[i]],b=gN[defaultAlgo.path[i+1]];if(a&&b){vizEdges.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#00C853',weight:5,opacity:.9}).addTo(map));}}
     defaultAlgo.path.forEach(n=>{const nd=gN[n];if(nd){vizMarkers.push(L.circleMarker([nd.lat,nd.lng],{radius:6,fillColor:'#10B981',color:'#0F172A',weight:1,fillOpacity:.9}).addTo(map).bindTooltip(nd.name||n,{direction:'top',offset:[0,-5]}));}});
   }
-  getOSRM(mO.lat,mO.lng,mD.lat,mD.lng).then(osrm=>{if(osrm){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];if(roadPl)map.removeLayer(roadPl);roadPl=L.polyline(osrm.coords,{color:'#10B981',weight:5,opacity:.85}).addTo(map);map.fitBounds(roadPl.getBounds().pad(.1));}});
+  getOSRM(mO.lat,mO.lng,mD.lat,mD.lng).then(osrm=>{if(osrm){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];drawHighVisPath(osrm.coords);map.fitBounds(roadPl.getBounds().pad(.1));}});
 
   // Traffic info on path nodes
   let trafficHtml='';
@@ -444,16 +439,16 @@ async function replayAlgo(algoKey){
     if(!running)break;
     if(s.action==='visit'){const nd=gN[s.node];if(!nd)continue;const col=s.is_pivot?'#7c3aed':'#3B82F6';if(!tmpMk[s.node]){tmpMk[s.node]=L.circleMarker([nd.lat,nd.lng],{radius:s.is_pivot?9:7,fillColor:col,color:'#1E293B',weight:1,fillOpacity:.8}).addTo(map);vizMarkers.push(tmpMk[s.node]);}else tmpMk[s.node].setStyle({fillColor:col});await slp(delay());}
     else if(s.action==='relax'){const nf=gN[s.from],nt=gN[s.to];if(nf&&nt&&(finalPathSet.has(s.from)||finalPathSet.has(s.to))){vizEdges.push(L.polyline([[nf.lat,nf.lng],[nt.lat,nt.lng]],{color:'#F59E0B',weight:2,opacity:.4,dashArray:'4 3'}).addTo(map));}if(nt&&!tmpMk[s.to]){tmpMk[s.to]=L.circleMarker([nt.lat,nt.lng],{radius:6,fillColor:'#F59E0B',color:'#1E293B',weight:1,fillOpacity:.5}).addTo(map);vizMarkers.push(tmpMk[s.to]);}await slp(delay()/4);}
-    else if(s.action==='path'){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];(s.path||[]).forEach(n=>pathNodes.add(n));for(let i=0;i<(s.path||[]).length-1;i++){const a=gN[s.path[i]],b=gN[s.path[i+1]];if(a&&b)vizEdges.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#10B981',weight:4,opacity:.9}).addTo(map));}Object.entries(tmpMk).forEach(([id,m])=>{if(pathNodes.has(id))m.setStyle({fillColor:'#10B981',radius:9});else{map.removeLayer(m);const idx=vizMarkers.indexOf(m);if(idx>=0)vizMarkers.splice(idx,1);}});await slp(delay());}
+    else if(s.action==='path'){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];(s.path||[]).forEach(n=>pathNodes.add(n));for(let i=0;i<(s.path||[]).length-1;i++){const a=gN[s.path[i]],b=gN[s.path[i+1]];if(a&&b)vizEdges.push(L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#00C853',weight:5,opacity:.9}).addTo(map));}Object.entries(tmpMk).forEach(([id,m])=>{if(pathNodes.has(id))m.setStyle({fillColor:'#00C853',radius:9});else{map.removeLayer(m);const idx=vizMarkers.indexOf(m);if(idx>=0)vizMarkers.splice(idx,1);}});await slp(delay());}
   }
   const osrm=await getOSRM(mO.lat,mO.lng,mD.lat,mD.lng);
-  if(osrm){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];if(roadPl)map.removeLayer(roadPl);roadPl=L.polyline(osrm.coords,{color:'#10B981',weight:5,opacity:.85}).addTo(map);map.fitBounds(roadPl.getBounds().pad(.1));}
+  if(osrm){vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];drawHighVisPath(osrm.coords);map.fitBounds(roadPl.getBounds().pad(.1));}
   running=false;
 }
 
 // ─── Utils ───
 function rstM(){running=false;rstViz();mO=null;mD=null;if(mOM){map.removeLayer(mOM);mOM=null;}if(mDM){map.removeLayer(mDM);mDM=null;}document.getElementById('ol').textContent='Click map';document.getElementById('ol').style.color='#94A3B8';document.getElementById('dl').textContent='Click map';document.getElementById('dl').style.color='#94A3B8';document.getElementById('btnR').disabled=true;document.getElementById('cmpResult').innerHTML='';document.getElementById('liveCmpResult').innerHTML='';}
-function rstViz(){vizMarkers.forEach(m=>map.removeLayer(m));vizMarkers=[];vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];if(roadPl){map.removeLayer(roadPl);roadPl=null;}}
+function rstViz(){vizMarkers.forEach(m=>map.removeLayer(m));vizMarkers=[];vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];if(roadPl){map.removeLayer(roadPl);roadPl=null;}if(glowPl){map.removeLayer(glowPl);glowPl=null;}}
 function ml(el,h){el.innerHTML=`<div class="ms">${h}</div>`+el.innerHTML;}
 function slp(ms){return new Promise(r=>setTimeout(r,ms));}
 async function loadEx(){try{const r=await fetch(API+'/api/driver/viz/missions');const m=await r.json();m.forEach(d=>handleNew(d));}catch(e){}}
