@@ -60,10 +60,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> checkSession() async {
-    final token = await _repository.getSavedSession();
-    if (token != null) {
-      state = AuthState.authenticated;
-    } else {
+    try {
+      final user = await _repository.validateSession();
+      if (user != null) {
+        _ref.read(currentUserProvider.notifier).state = user;
+        state = AuthState.authenticated;
+      } else {
+        state = AuthState.unauthenticated;
+      }
+    } catch (_) {
       state = AuthState.unauthenticated;
     }
   }

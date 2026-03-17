@@ -25,6 +25,17 @@ class AuthRepository {
     await _tokenStorage.deleteToken();
   }
 
+  Future<UserModel?> validateSession() async {
+    final token = await _tokenStorage.getToken();
+    if (token == null || token.isEmpty) return null;
+    final user = await _apiService.validateToken(token);
+    if (user == null) {
+      // Token is stale/invalid — clear it so we don't loop
+      await _tokenStorage.deleteToken();
+    }
+    return user;
+  }
+
   Future<String?> getSavedSession() async {
     return await _tokenStorage.getToken();
   }

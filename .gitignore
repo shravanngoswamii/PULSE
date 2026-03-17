@@ -78,6 +78,9 @@ pnpm-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+# Always commit the template — never the real secrets
+!.env.example
+
 
 # Logs and Databases
 *.log

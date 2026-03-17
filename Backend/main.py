@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from config import CORS_ORIGINS
+from config import CORS_ORIGINS, HOST, PORT
 from database import engine, Base, get_db
 from models import Edge, Intersection
 from routers import auth_router, driver_router, operator_router, admin_router, edge_router
@@ -129,4 +129,4 @@ async def ws_visualizer(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=9000, reload=True)
+    uvicorn.run("main:app", host=HOST, port=PORT, reload=True)

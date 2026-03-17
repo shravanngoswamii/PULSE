@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment files – never commit real .env, always commit .env.example
+.env
+!.env.example
+

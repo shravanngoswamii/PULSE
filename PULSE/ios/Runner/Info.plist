@@ -2,6 +2,37 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- ═══════════════════════════════════════════════════════════ -->
+	<!-- Location permissions – required by geolocator              -->
+	<!-- ═══════════════════════════════════════════════════════════ -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PULSE needs your location to show nearby hospitals and track your ambulance route.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>PULSE needs your location in the background to keep the green corridor active during a mission.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>PULSE needs your location in the background to keep the green corridor active during a mission.</string>
+
+	<!-- ═══════════════════════════════════════════════════════════ -->
+	<!-- Allow HTTP to localhost for the dev backend                 -->
+	<!-- ═══════════════════════════════════════════════════════════ -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>10.0.2.2</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -65,6 +96,11 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- Background location updates for active mission GPS tracking -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
 	</array>
 </dict>
 </plist>

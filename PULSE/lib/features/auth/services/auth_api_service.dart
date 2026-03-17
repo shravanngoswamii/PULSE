@@ -16,6 +16,26 @@ class AuthApiService {
           ),
         );
 
+  Future<UserModel?> validateToken(String token) async {
+    try {
+      final response = await Dio(
+        BaseOptions(
+          baseUrl: Env.apiBaseUrl,
+          connectTimeout: Duration(milliseconds: Env.requestTimeout),
+          receiveTimeout: Duration(milliseconds: Env.requestTimeout),
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      ).get('/auth/me');
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        return UserModel.fromJson({...data, 'token': token});
+      }
+    } catch (_) {
+      // 401, network error, etc. — treat as invalid
+    }
+    return null;
+  }
+
   Future<UserModel> login(String email, String password) async {
     try {
       final response = await _dio.post(

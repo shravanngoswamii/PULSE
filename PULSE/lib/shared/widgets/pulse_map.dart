@@ -14,6 +14,8 @@ class PulseMap extends StatelessWidget {
   final List<LatLng> routeCoordinates;
   final LatLng? destinationPosition;
   final String? destinationLabel;
+  final void Function(TapPosition, LatLng)? onTap;
+  final List<Marker> extraMarkers;
 
   const PulseMap({
     super.key,
@@ -26,6 +28,8 @@ class PulseMap extends StatelessWidget {
     this.routeCoordinates = const [],
     this.destinationPosition,
     this.destinationLabel,
+    this.onTap,
+    this.extraMarkers = const [],
   });
 
   @override
@@ -101,6 +105,11 @@ class PulseMap extends StatelessWidget {
       );
     }
 
+    // Merge extra markers (e.g. destination pin from DestinationPickerScreen)
+    if (extraMarkers.isNotEmpty) {
+      allMarkers.addAll(extraMarkers);
+    }
+
     // Build polylines
     final allPolylines = <Polyline>[...polylines];
     if (routeCoordinates.isNotEmpty) {
@@ -117,6 +126,7 @@ class PulseMap extends StatelessWidget {
       options: MapOptions(
         initialCenter: mapCenter,
         initialZoom: zoom,
+        onTap: onTap,
       ),
       children: [
         TileLayer(
