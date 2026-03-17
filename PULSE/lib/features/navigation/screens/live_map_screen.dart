@@ -37,54 +37,58 @@ class LiveMapScreen extends ConsumerWidget {
   Widget _buildNoMissionView(BuildContext context, WidgetRef ref, LatLng? currentLatLng) {
     final mapCenter = currentLatLng ?? const LatLng(22.7196, 75.8577);
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.go('/dashboard'),
-        ),
-        title: Text(
-          'MAP VIEW',
-          style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1),
-        ),
-        centerTitle: true,
-      ),
       body: Stack(
         children: [
           PulseMap(
             center: mapCenter,
             currentPosition: currentLatLng,
           ),
-          // LIVE indicator
           Positioned(
-            top: 16,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.my_location, size: 14, color: AppColors.primary),
-                  const SizedBox(width: 4),
-                  Text('LIVE', style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                ],
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => context.go('/dashboard'),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: AppShadows.elevated,
+                        ),
+                        child: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: AppShadows.card,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+                          const SizedBox(width: 6),
+                          Text('LIVE', style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          // START MISSION button at bottom
           Positioned(
-            bottom: 24,
-            left: 16,
-            right: 16,
+            bottom: 32,
+            left: 20,
+            right: 20,
             child: AppButton(
               text: 'START MISSION',
               variant: ButtonVariant.primary,
@@ -130,20 +134,8 @@ class LiveMapScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.go('/dashboard'),
-        ),
-        title: Text(
-          'ACTIVE MISSION',
-          style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1),
-        ),
-        centerTitle: true,
-      ),
       body: Stack(
         children: [
-          // Map with route polyline
           PulseMap(
             center: mapCenter,
             currentPosition: currentLatLng,
@@ -153,55 +145,82 @@ class LiveMapScreen extends ConsumerWidget {
             destinationLabel: currentMission.destinationHospital.name,
           ),
 
-          // Top Header Layer (HUD)
           Positioned(
-            top: 12,
-            left: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.my_location, size: 14, color: AppColors.primary),
-                  const SizedBox(width: 4),
-                  Text('LIVE', style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                ],
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => context.go('/dashboard'),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: AppShadows.elevated,
+                        ),
+                        child: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary, size: 20),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: AppShadows.card,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.emergency, shape: BoxShape.circle)),
+                          const SizedBox(width: 6),
+                          Text('ACTIVE', style: AppTextStyles.caption.copyWith(color: AppColors.emergency, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: AppShadows.card,
+                      ),
+                      child: Text(
+                        '${currentMission.signalsCleared} signals',
+                        style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // Bottom HUD Layer - compact
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, -8),
                   ),
                 ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Drag handle
                   Container(
                     width: 36,
                     height: 4,
@@ -210,79 +229,84 @@ class LiveMapScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
 
-                  // Distance + ETA in one compact row
                   Row(
                     children: [
                       Expanded(
-                        child: Row(
-                          children: [
-                            Icon(Icons.route, size: 16, color: AppColors.primary),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${currentMission.distance.toStringAsFixed(1)} km',
-                              style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                            ),
-                          ],
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.route_rounded, size: 20, color: AppColors.primary),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${currentMission.distance.toStringAsFixed(1)} km',
+                                style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
+                              ),
+                              Text('Distance', style: AppTextStyles.micro),
+                            ],
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Row(
-                          children: [
-                            Icon(Icons.schedule, size: 16, color: AppColors.primary),
-                            const SizedBox(width: 6),
-                            Text(
-                              currentMission.eta,
-                              style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${currentMission.signalsCleared} signals',
-                          style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(Icons.schedule_rounded, size: 20, color: AppColors.primary),
+                              const SizedBox(height: 6),
+                              Text(
+                                currentMission.eta,
+                                style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
+                              ),
+                              Text('ETA', style: AppTextStyles.micro),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
 
-                  // Compact destination card
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: AppShadows.card,
                     ),
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            gradient: AppColors.primaryGradient,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.local_hospital, color: AppColors.primary, size: 18),
+                          child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 18),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 currentMission.destinationHospital.name,
-                                style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 'Green Corridor Active',
                                 style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600),
@@ -293,30 +317,35 @@ class LiveMapScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  // End Mission Button
-                  SizedBox(
-                    height: 44,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await ref.read(missionProvider.notifier).endMission();
-                        if (context.mounted) {
-                          context.go('/mission/summary');
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.emergency,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
+                  GestureDetector(
+                    onTap: () async {
+                      await ref.read(missionProvider.notifier).endMission();
+                      if (context.mounted) {
+                        context.go('/dashboard');
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.emergencyGradient,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.emergency.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.stop_circle_outlined, size: 18),
-                          const SizedBox(width: 6),
-                          Text('END MISSION', style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                          const Icon(Icons.stop_circle_rounded, color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Text('END MISSION', style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.w700, letterSpacing: 1)),
                         ],
                       ),
                     ),

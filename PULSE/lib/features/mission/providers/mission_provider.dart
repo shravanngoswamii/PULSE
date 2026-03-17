@@ -41,6 +41,41 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
 
   MissionNotifier(this._repository, this._ref) : super(null);
 
+  void restoreFromBackend(Map<String, dynamic> missionData) {
+    if (state != null && state!.status == MissionStatus.active) return;
+
+    final missionId = (missionData['id'] ?? '').toString();
+    final status = missionData['status'] as String?;
+    if (status != 'active' || missionId.isEmpty) return;
+
+    final destName = missionData['destination_name'] as String? ?? '';
+    final destLat = (missionData['destination_lat'] as num?)?.toDouble() ?? 0.0;
+    final destLng = (missionData['destination_lng'] as num?)?.toDouble() ?? 0.0;
+    final distanceKm = (missionData['distance_km'] as num?)?.toDouble() ?? 0.0;
+    final etaMin = (missionData['eta_minutes'] as num?)?.toDouble() ?? 0.0;
+    final signalsCleared = (missionData['signals_cleared'] as num?)?.toInt() ?? 0;
+
+    state = MissionModel(
+      missionId: missionId,
+      incidentType: missionData['incident_type'] as String? ?? '',
+      priorityLevel: missionData['priority'] as String? ?? '',
+      destinationHospital: HospitalModel(
+        id: 'restored',
+        name: destName,
+        lat: destLat,
+        lng: destLng,
+        distanceKm: distanceKm,
+        etaMinutes: etaMin,
+      ),
+      distance: distanceKm,
+      eta: '${etaMin.toInt()} min',
+      signalsCleared: signalsCleared,
+      status: MissionStatus.active,
+    );
+
+    _startGpsTracking(missionId);
+  }
+
   Future<void> startMission({
     required String incidentType,
     required String priority,

@@ -6,14 +6,17 @@ Routing service that combines:
 import httpx
 import math
 import heapq
+import time
 from typing import Dict, List, Tuple, Optional
 from sqlalchemy.orm import Session
 from models import Intersection, Edge
 from schemas import GPSLocation
 
+_graph_cache = {"nodes": None, "graph": None, "ts": 0}
+_CACHE_TTL = 30
+
 
 def haversine(lat1, lon1, lat2, lon2) -> float:
-    """Distance in meters between two GPS points."""
     R = 6371000
     p1, p2 = math.radians(lat1), math.radians(lat2)
     dp = math.radians(lat2 - lat1)
@@ -23,7 +26,10 @@ def haversine(lat1, lon1, lat2, lon2) -> float:
 
 
 def load_graph(db: Session) -> Tuple[dict, dict]:
-    """Load nodes and adjacency list from DB."""
+    now = time.time()
+    if _graph_cache["nodes"] and (now - _graph_cache["ts"]) < _CACHE_TTL:
+        return _graph_cache["nodes"], _graph_cache["graph"]
+
     nodes = {}
     for i in db.query(Intersection).all():
         nodes[i.id] = {"lat": i.lat, "lng": i.lng, "name": i.name}
@@ -33,7 +39,14 @@ def load_graph(db: Session) -> Tuple[dict, dict]:
         if e.from_id in graph:
             graph[e.from_id][e.to_id] = e.current_weight
 
+    _graph_cache["nodes"] = nodes
+    _graph_cache["graph"] = graph
+    _graph_cache["ts"] = now
     return nodes, graph
+
+
+def invalidate_graph_cache():
+    _graph_cache["ts"] = 0
 
 
 def snap_to_node(lat: float, lng: float, nodes: dict) -> str:

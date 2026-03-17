@@ -86,10 +86,9 @@ async def start_mission(req: MissionStartRequest, user: User = Depends(require_r
         origin_lat, origin_lng, req.destination_lat, req.destination_lng, nodes, graph
     )
 
-    # Step 2: Get actual road-following route from OSRM
-    waypoints = [{"lat": nodes[n]["lat"], "lng": nodes[n]["lng"]} for n in intersection_path]
+    # Step 2: Get actual road-following route from OSRM (direct, no waypoints)
     road_coords, distance_km, eta_minutes = await get_osrm_route(
-        origin_lat, origin_lng, req.destination_lat, req.destination_lng, waypoints
+        origin_lat, origin_lng, req.destination_lat, req.destination_lng
     )
 
     # Fallback ETA/distance from graph if OSRM failed
@@ -210,22 +209,24 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
         vehicle.current_lat = ping.current_lat
         vehicle.current_lng = ping.current_lng
 
-    # Get OSRM route from current position to destination
+    # Get OSRM route from current position to destination (runs async)
     road_coords, distance_km, eta_minutes = await get_osrm_route(
         ping.current_lat, ping.current_lng,
         mission.destination_lat, mission.destination_lng,
     )
 
-    # Update intersection path
+    # Update signal count using cached graph
     nodes, graph = load_graph(db)
-    current_node = snap_to_node(ping.current_lat, ping.current_lng, nodes)
     old_path = json.loads(mission.route_path) if mission.route_path else []
 
-    # Count cleared signals
-    cleared = len([n for n in old_path if n not in [current_node] and nodes.get(n) and
-                   haversine(ping.current_lat, ping.current_lng, nodes[n]["lat"], nodes[n]["lng"]) > 500])
-    # Simple: count intersections we've passed (closer to origin than to us)
-    mission.signals_cleared = max(mission.signals_cleared, len(old_path) - len([n for n in old_path if haversine(ping.current_lat, ping.current_lng, nodes[n]["lat"], nodes[n]["lng"]) < haversine(mission.origin_lat, mission.origin_lng, nodes[n]["lat"], nodes[n]["lng"])]))
+    passed = 0
+    for n in old_path:
+        if n in nodes:
+            d_to_vehicle = haversine(ping.current_lat, ping.current_lng, nodes[n]["lat"], nodes[n]["lng"])
+            d_to_origin = haversine(mission.origin_lat, mission.origin_lng, nodes[n]["lat"], nodes[n]["lng"])
+            if d_to_vehicle > d_to_origin:
+                passed += 1
+    mission.signals_cleared = max(mission.signals_cleared, passed)
 
     if distance_km > 0:
         mission.eta_minutes = eta_minutes
@@ -254,6 +255,7 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
         route_intersections=old_path,
         next_signal_state="PRIMARY",
         signals_on_route=len(old_path),
+        signals_cleared=mission.signals_cleared,
     )
 
 

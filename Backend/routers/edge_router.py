@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Edge, Intersection
 from schemas import DensityUpdate
+from routing_service import invalidate_graph_cache
 
 router = APIRouter(prefix="/api/edge", tags=["Edge AI"])
 
@@ -31,4 +32,5 @@ def receive_density(payload: DensityUpdate, db: Session = Depends(get_db)):
         intersection.vehicles_waiting = int(weight)
 
     db.commit()
+    invalidate_graph_cache()
     return {"status": "ok", "multiplier": round(multiplier, 2)}

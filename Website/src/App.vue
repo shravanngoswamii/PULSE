@@ -24,11 +24,6 @@ const route = useRoute()
 .app-root {
   min-height: 100vh;
   background-color: var(--bg);
-  background-image: 
-    linear-gradient(var(--grid-color, rgba(0, 230, 118, 0.03)) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-color, rgba(0, 230, 118, 0.03)) 1px, transparent 1px);
-  background-size: 30px 30px;
-  background-position: center center;
 }
 
 .watermark {
@@ -51,5 +46,18 @@ const route = useRoute()
 .main-content {
   position: relative;
   z-index: 1;
+  background-image:
+    linear-gradient(rgba(11, 14, 20, 0.78), rgba(11, 14, 20, 0.72)),
+    url('./assets/PULSEbg.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+body.light-theme .main-content {
+  background-image:
+    linear-gradient(rgba(248, 250, 252, 0.82), rgba(248, 250, 252, 0.74)),
+    url('./assets/PULSEbg.png');
 }
 </style>

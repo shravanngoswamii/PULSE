@@ -21,60 +21,76 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = _getBackgroundColor();
-    final height = variant == ButtonVariant.emergency ? 52.0 : AppSpacing.buttonHeight;
-    
-    return SizedBox(
-      height: height,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: Colors.white,
-          elevation: variant == ButtonVariant.emergency ? 4 : 0,
-          shadowColor: variant == ButtonVariant.emergency ? AppColors.emergency.withValues(alpha: 0.4) : null,
+    return GestureDetector(
+      onTap: isLoading ? null : onPressed,
+      child: Container(
+        width: double.infinity,
+        height: AppSpacing.buttonHeight,
+        decoration: BoxDecoration(
+          gradient: _getGradient(),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _getShadow(),
         ),
-        child: isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (variant == ButtonVariant.emergency) ...[
-                    const Icon(Icons.emergency_outlined, color: Colors.white),
-                    const SizedBox(width: 8),
-                  ] else if (icon != null) ...[
-                    Icon(icon, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(
-                    text.toUpperCase(),
-                    style: AppTextStyles.body.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
+        child: Center(
+          child: isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
-                ],
-              ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (variant == ButtonVariant.emergency) ...[
+                      const Icon(Icons.emergency_rounded, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                    ] else if (icon != null) ...[
+                      Icon(icon, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      text.toUpperCase(),
+                      style: AppTextStyles.label.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
 
-  Color _getBackgroundColor() {
+  LinearGradient _getGradient() {
     switch (variant) {
       case ButtonVariant.primary:
-        return AppColors.primary;
+        return AppColors.primaryGradient;
       case ButtonVariant.secondary:
-        return AppColors.secondary;
+        return AppColors.darkGradient;
       case ButtonVariant.emergency:
-        return AppColors.emergency;
+        return AppColors.emergencyGradient;
+    }
+  }
+
+  List<BoxShadow> _getShadow() {
+    switch (variant) {
+      case ButtonVariant.primary:
+        return AppShadows.glow;
+      case ButtonVariant.secondary:
+        return AppShadows.elevated;
+      case ButtonVariant.emergency:
+        return [
+          BoxShadow(
+            color: AppColors.emergency.withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ];
     }
   }
 }

@@ -39,6 +39,7 @@
       </div>
 
       <div class="bento-card hero-card alert-card">
+        <div class="card-bg-effect alert-grid-bg"></div>
         <div class="card-bg-effect pulse-warn" v-if="stats.active_alerts > 0"></div>
         <div class="bento-content">
           <div class="bento-header">
@@ -524,6 +525,14 @@ onMounted(loadStats)
                     linear-gradient(90deg, rgba(0, 230, 118, 0.02) 1px, transparent 1px);
   background-size: 100% 100%, 20px 20px, 20px 20px;
   opacity: 0.8;
+}
+
+.alert-grid-bg {
+  background-image: radial-gradient(circle at 100% 0%, rgba(255, 82, 82, 0.16) 0%, transparent 60%),
+                    linear-gradient(rgba(255, 82, 82, 0.02) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 82, 82, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+  opacity: 0.85;
 }
 
 .pulse-warn {

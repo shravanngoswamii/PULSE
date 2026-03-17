@@ -123,6 +123,7 @@ class RouteResponse(BaseModel):
     route_intersections: List[str]
     next_signal_state: str
     signals_on_route: int
+    signals_cleared: int = 0
 
 class GPSPing(BaseModel):
     mission_id: str

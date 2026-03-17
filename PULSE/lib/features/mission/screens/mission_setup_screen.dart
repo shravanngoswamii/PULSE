@@ -60,271 +60,318 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.go('/dashboard'),
-        ),
-        title: Text(
-          'MISSION SETUP',
-          style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          children: [
-            // 1. Vehicle Info - compact
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.medical_services, color: AppColors.primary, size: 18),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Container(
+              decoration: BoxDecoration(gradient: AppColors.darkGradient),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => context.go('/dashboard'),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text('MISSION SETUP', style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                          const Spacer(),
+                          const SizedBox(width: 36),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.07),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                gradient: AppColors.primaryGradient,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.medical_services_rounded, color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(user?.vehicleId ?? 'N/A', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w700, color: Colors.white)),
+                            const SizedBox(width: 8),
+                            Text(user?.name ?? '', style: AppTextStyles.micro.copyWith(color: Colors.white54)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Text(user?.vehicleId ?? 'N/A', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                  const SizedBox(width: 8),
-                  Text(user?.name ?? '', style: AppTextStyles.micro),
-                ],
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-
-            // 2. Incident Details - compact
-            SectionCard(
-              title: 'INCIDENT',
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   Container(
-                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                     decoration: BoxDecoration(
-                       border: Border.all(color: AppColors.border),
-                       borderRadius: BorderRadius.circular(8),
-                     ),
-                     child: DropdownButtonHideUnderline(
-                       child: DropdownButton<String>(
-                         value: _selectedIncident,
-                         isExpanded: true,
-                         isDense: true,
-                         items: _incidentTypes.map((type) {
-                           return DropdownMenuItem(value: type, child: Text(type, style: AppTextStyles.label));
-                         }).toList(),
-                         onChanged: (v) => setState(() => _selectedIncident = v!),
-                       ),
-                     ),
-                   ),
-                   const SizedBox(height: 10),
-                   Row(
-                     children: _priorities.map((p) {
-                       final isSelected = _selectedPriority == p;
-                       return Expanded(
-                         child: Padding(
-                           padding: const EdgeInsets.symmetric(horizontal: 3),
-                           child: InkWell(
-                             onTap: () => setState(() => _selectedPriority = p),
-                             child: Container(
-                               padding: const EdgeInsets.symmetric(vertical: 8),
-                               decoration: BoxDecoration(
-                                 color: isSelected ? AppColors.primary : Colors.white,
-                                 border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
-                                 borderRadius: BorderRadius.circular(8),
-                               ),
-                               child: Center(
-                                 child: Text(
-                                   p,
-                                   style: AppTextStyles.micro.copyWith(
-                                     color: isSelected ? Colors.white : AppColors.textPrimary,
-                                     fontWeight: FontWeight.bold,
-                                   ),
-                                 ),
-                               ),
-                             ),
-                           ),
-                         ),
-                       );
-                     }).toList(),
-                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // 3. Destination Selection
-            SectionCard(
-              title: 'DESTINATION',
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Current location - compact
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.my_location, color: AppColors.primary, size: 14),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: positionAsync.when(
-                            loading: () => Text('Acquiring GPS...', style: AppTextStyles.micro),
-                            error: (_, __) => Text('GPS unavailable', style: AppTextStyles.micro),
-                            data: (pos) {
-                              if (pos == null) {
-                                return Text('GPS unavailable', style: AppTextStyles.micro);
-                              }
-                              final placeAsync = ref.watch(
-                                reverseGeocodeProvider((lat: pos.latitude, lng: pos.longitude)),
-                              );
-                              return placeAsync.when(
-                                loading: () => Text('Resolving...', style: AppTextStyles.micro),
-                                error: (_, __) => Text(
-                                  '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}',
-                                  style: AppTextStyles.micro,
+          ),
+          SliverToBoxAdapter(
+            child: Transform.translate(
+              offset: const Offset(0, -12),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Column(
+                    children: [
+                      SectionCard(
+                        title: 'INCIDENT',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedIncident,
+                                  isExpanded: true,
+                                  isDense: true,
+                                  items: _incidentTypes.map((type) {
+                                    return DropdownMenuItem(value: type, child: Text(type, style: AppTextStyles.label.copyWith(color: AppColors.textPrimary)));
+                                  }).toList(),
+                                  onChanged: (v) => setState(() => _selectedIncident = v!),
                                 ),
-                                data: (placeName) => Text(
-                                  placeName ?? '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}',
-                                  style: AppTextStyles.micro.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                                  overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: _priorities.map((p) {
+                                final isSelected = _selectedPriority == p;
+                                return Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    child: GestureDetector(
+                                      onTap: () => setState(() => _selectedPriority = p),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                        decoration: BoxDecoration(
+                                          gradient: isSelected ? AppColors.primaryGradient : null,
+                                          color: isSelected ? null : Colors.white,
+                                          borderRadius: BorderRadius.circular(12),
+                                          boxShadow: isSelected ? AppShadows.glow : AppShadows.card,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            p,
+                                            style: AppTextStyles.caption.copyWith(
+                                              color: isSelected ? Colors.white : AppColors.textPrimary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      SectionCard(
+                        title: 'DESTINATION',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.my_location_rounded, color: AppColors.primary, size: 16),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: positionAsync.when(
+                                      loading: () => Text('Acquiring GPS...', style: AppTextStyles.micro),
+                                      error: (_, __) => Text('GPS unavailable', style: AppTextStyles.micro),
+                                      data: (pos) {
+                                        if (pos == null) {
+                                          return Text('GPS unavailable', style: AppTextStyles.micro);
+                                        }
+                                        final placeAsync = ref.watch(
+                                          reverseGeocodeProvider((lat: pos.latitude, lng: pos.longitude)),
+                                        );
+                                        return placeAsync.when(
+                                          loading: () => Text('Resolving...', style: AppTextStyles.micro),
+                                          error: (_, __) => Text(
+                                            '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}',
+                                            style: AppTextStyles.micro,
+                                          ),
+                                          data: (placeName) => Text(
+                                            placeName ?? '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}',
+                                            style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                hintText: 'Search hospitals...',
+                                hintStyle: AppTextStyles.micro,
+                                prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textSecondary),
+                                isDense: true,
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppColors.border),
                                 ),
-                              );
-                            },
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppColors.border),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                                ),
+                              ),
+                              onChanged: (value) => setState(() => _searchQuery = value),
+                            ),
+                            const SizedBox(height: 10),
+                            _buildHospitalList(positionAsync),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: () async {
+                                final result = await context.push<Map<String, dynamic>>('/mission/pick-destination');
+                                if (result != null && mounted) {
+                                  setState(() {
+                                    _selectedHospital = HospitalModel(
+                                      id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
+                                      name: result['name'] as String,
+                                      lat: result['lat'] as double,
+                                      lng: result['lng'] as double,
+                                      distanceKm: 0.0,
+                                      etaMinutes: 0.0,
+                                    );
+                                  });
+                                }
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: AppColors.primary),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.map_outlined, size: 16, color: AppColors.primary),
+                                    const SizedBox(width: 6),
+                                    Text('Choose on Map', style: AppTextStyles.label.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      if (_selectedHospital != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: AppShadows.card,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceLight,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.route_rounded, color: AppColors.primary, size: 20),
+                              ),
+                              const SizedBox(width: 14),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${_selectedHospital!.distanceKm.toStringAsFixed(1)} km', style: AppTextStyles.sectionTitle.copyWith(fontSize: 18)),
+                                  Text('ETA: ${_selectedHospital!.eta}', style: AppTextStyles.micro),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  // Search filter
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search hospitals...',
-                      hintStyle: AppTextStyles.micro,
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                    ),
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildHospitalList(positionAsync),
-                  const SizedBox(height: 6),
-                  // Choose on Map button
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final result = await context.push<Map<String, dynamic>>('/mission/pick-destination');
-                      if (result != null && mounted) {
-                        setState(() {
-                          _selectedHospital = HospitalModel(
-                            id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
-                            name: result['name'] as String,
-                            lat: result['lat'] as double,
-                            lng: result['lng'] as double,
-                            distanceKm: 0.0,
-                            etaMinutes: 0.0,
-                          );
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.map_outlined, size: 16),
-                    label: const Text('Choose on Map', style: TextStyle(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(36),
-                      side: const BorderSide(color: AppColors.primary),
-                      foregroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
+                      const SizedBox(height: 20),
 
-            // 4. Route Preview Card - smaller
-            if (_selectedHospital != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                      AppButton(
+                        text: 'START MISSION',
+                        variant: ButtonVariant.emergency,
+                        onPressed: () async {
+                          if (_selectedHospital != null) {
+                            final position = ref.read(currentPositionProvider).valueOrNull;
+                            final originLat = position?.latitude ?? 0.0;
+                            final originLng = position?.longitude ?? 0.0;
+
+                            final router = GoRouter.of(context);
+                            await ref.read(missionProvider.notifier).startMission(
+                              incidentType: _selectedIncident,
+                              priority: _selectedPriority,
+                              hospital: _selectedHospital!,
+                              originLat: originLat,
+                              originLng: originLng,
+                            );
+                            router.go('/mission/active');
+                          }
+                        },
                       ),
-                      child: const Icon(Icons.route, color: AppColors.primary, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${_selectedHospital!.distanceKm.toStringAsFixed(1)} km', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                        Text('ETA: ${_selectedHospital!.eta}', style: AppTextStyles.micro),
-                      ],
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => context.go('/dashboard'),
+                        child: Text('CANCEL', style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
               ),
-            const SizedBox(height: 16),
-
-            // Start Mission Button
-            AppButton(
-              text: 'START MISSION',
-              variant: ButtonVariant.emergency,
-              onPressed: () async {
-                if (_selectedHospital != null) {
-                  final position = ref.read(currentPositionProvider).valueOrNull;
-                  final originLat = position?.latitude ?? 0.0;
-                  final originLng = position?.longitude ?? 0.0;
-
-                  final router = GoRouter.of(context);
-                  await ref.read(missionProvider.notifier).startMission(
-                    incidentType: _selectedIncident,
-                    priority: _selectedPriority,
-                    hospital: _selectedHospital!,
-                    originLat: originLat,
-                    originLng: originLng,
-                  );
-                  router.go('/mission/active');
-                }
-              },
             ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => context.go('/dashboard'),
-              child: Text('CANCEL', style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

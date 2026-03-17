@@ -10,5 +10,11 @@ final dashboardApiServiceProvider = Provider<DashboardApiService>((ref) {
 
 final dashboardProvider = FutureProvider<DashboardModel>((ref) async {
   final apiService = ref.watch(dashboardApiServiceProvider);
-  return await apiService.getDashboardData();
+  final data = await apiService.getDashboardData();
+
+  if (data.activeMission != null) {
+    ref.read(missionProvider.notifier).restoreFromBackend(data.activeMission!);
+  }
+
+  return data;
 });

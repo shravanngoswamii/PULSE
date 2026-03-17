@@ -67,8 +67,18 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: var(--bg);
-  background-image: radial-gradient(circle at center, rgba(0, 230, 118, 0.05) 0%, transparent 70%);
+  background-image:
+    linear-gradient(rgba(11, 14, 20, 0.78), rgba(11, 14, 20, 0.72)),
+    url('../assets/PULSEbg.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+:global(body.light-theme) .login-page {
+  background-image:
+    linear-gradient(rgba(248, 250, 252, 0.82), rgba(248, 250, 252, 0.74)),
+    url('../assets/PULSEbg.png');
 }
 
 .login-card {
