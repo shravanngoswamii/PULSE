@@ -69,6 +69,34 @@ def get_graph_data(db: Session = Depends(get_db)):
     return {"nodes": nodes, "edges": edge_list}
 
 
+@app.get("/api/visualizer/compare")
+def compare_algorithms(
+    origin_lat: float, origin_lng: float,
+    dest_lat: float, dest_lng: float,
+    db: Session = Depends(get_db),
+):
+    """Run all 5 shortest-path algorithms on the same graph & endpoints."""
+    from algorithms import run_all
+    from routing_service import load_graph, snap_to_node
+
+    nodes, graph = load_graph(db)
+    start = snap_to_node(origin_lat, origin_lng, nodes)
+    end = snap_to_node(dest_lat, dest_lng, nodes)
+
+    if not start or not end:
+        return {"error": "Could not snap to graph nodes"}
+    if start == end:
+        return {"error": "Origin and destination snap to the same intersection"}
+
+    results = run_all(nodes, graph, start, end)
+    return {
+        "start": start, "end": end,
+        "start_name": nodes[start]["name"],
+        "end_name": nodes[end]["name"],
+        "results": results,
+    }
+
+
 # --- WebSocket Endpoints ---
 
 @app.websocket("/ws/operator")
