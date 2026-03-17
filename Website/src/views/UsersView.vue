@@ -18,7 +18,7 @@
       </select>
     </div>
 
-    <div class="card">
+    <div class="card pulse-table-card table-glass">
       <table class="data-table">
         <thead>
           <tr>
@@ -27,19 +27,30 @@
             <th>Role</th>
             <th>Vehicle</th>
             <th>Status</th>
-            <th>Actions</th>
+            <th style="text-align: right;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="u in filtered" :key="u.id">
-            <td style="font-weight: 600">{{ u.name }}</td>
-            <td>{{ u.email }}</td>
-            <td><span class="badge" :class="roleClass(u.role)">{{ u.role }}</span></td>
-            <td>{{ u.vehicle_id || '-' }}</td>
-            <td><span class="badge" :class="u.is_active ? 'badge-green' : 'badge-red'">{{ u.is_active ? 'Active' : 'Disabled' }}</span></td>
+            <td style="font-weight: 600; color: var(--primary)">{{ u.name }}</td>
+            <td style="opacity: 0.9">{{ u.email }}</td>
             <td>
-              <button class="btn btn-outline btn-sm" @click="openEdit(u)">Edit</button>
-              <button class="btn btn-danger btn-sm" @click="remove(u)" style="margin-left: 4px">Delete</button>
+              <span class="pulse-badge" :style="roleStyle(u.role)">
+                <span class="badge-dot"></span>
+                {{ u.role }}
+              </span>
+            </td>
+            <td style="font-family: monospace;">{{ u.vehicle_id || '-' }}</td>
+            <td>
+              <span class="badge" :class="u.is_active ? 'badge-green' : 'badge-red'">{{ u.is_active ? 'Active' : 'Disabled' }}</span>
+            </td>
+            <td style="text-align: right;">
+              <button class="btn btn-outline btn-sm action-btn" @click="openEdit(u)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              </button>
+              <button class="btn btn-danger btn-sm action-btn" @click="remove(u)" style="margin-left: 6px" :disabled="u.email === 'admin@pulse.com'">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              </button>
             </td>
           </tr>
         </tbody>
@@ -109,10 +120,10 @@ const filtered = computed(() => {
   })
 })
 
-function roleClass(r) {
-  if (r === 'admin') return 'badge-red'
-  if (r === 'operator') return 'badge-blue'
-  return 'badge-green'
+function roleStyle(r) {
+  if (r === 'admin') return 'color: var(--danger); border-color: rgba(255,82,82,0.3); background: rgba(255,82,82,0.1)'
+  if (r === 'operator') return 'color: var(--blue); border-color: rgba(68,138,255,0.3); background: rgba(68,138,255,0.1)'
+  return 'color: var(--primary); border-color: rgba(0,230,118,0.3); background: rgba(0,230,118,0.1)'
 }
 
 function openCreate() {

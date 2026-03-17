@@ -8,7 +8,7 @@
       <button class="btn btn-primary" @click="openCreate">+ Create Alert</button>
     </div>
 
-    <div class="card">
+    <div class="card pulse-table-card table-glass">
       <table class="data-table">
         <thead>
           <tr>
@@ -18,19 +18,26 @@
             <th>Location</th>
             <th>Status</th>
             <th>Created</th>
-            <th>Actions</th>
+            <th style="text-align: right">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="a in alerts" :key="a.id">
-            <td style="font-weight: 600">{{ a.title }}</td>
+            <td style="font-weight: 600; color: var(--danger)">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="badge-dot" style="color: var(--danger)" v-if="a.is_active"></span>
+                {{ a.title }}
+              </div>
+            </td>
             <td><span class="badge badge-gray">{{ a.type }}</span></td>
             <td><span class="badge" :class="a.severity === 'high' ? 'badge-red' : a.severity === 'medium' ? 'badge-yellow' : 'badge-green'">{{ a.severity }}</span></td>
             <td>{{ a.location || 'N/A' }}</td>
             <td><span class="badge" :class="a.is_active ? 'badge-red' : 'badge-gray'">{{ a.is_active ? 'Active' : 'Cleared' }}</span></td>
-            <td style="font-size: 12px">{{ formatDate(a.created_at) }}</td>
-            <td>
-              <button class="btn btn-danger btn-sm" @click="remove(a)">Delete</button>
+            <td style="font-size: 12px; opacity: 0.8">{{ formatDate(a.created_at) }}</td>
+            <td style="text-align: right">
+              <button class="btn btn-danger btn-sm action-btn" @click="remove(a)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              </button>
             </td>
           </tr>
         </tbody>

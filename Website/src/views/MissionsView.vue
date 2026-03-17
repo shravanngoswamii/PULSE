@@ -17,7 +17,7 @@
       </select>
     </div>
 
-    <div class="card">
+    <div class="card pulse-table-card table-glass">
       <table class="data-table">
         <thead>
           <tr>
@@ -30,21 +30,21 @@
             <th>ETA</th>
             <th>Distance</th>
             <th>Status</th>
-            <th>Started</th>
+            <th style="text-align: right">Started</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="m in filtered" :key="m.id">
-            <td style="font-family: monospace; font-size: 12px">{{ m.id }}</td>
-            <td>{{ m.vehicle_name || m.vehicle_id }}</td>
-            <td>{{ m.driver_name || '-' }}</td>
+            <td style="font-family: monospace; font-size: 13px; font-weight: 800; color: var(--primary)">{{ m.id }}</td>
+            <td style="font-weight: 600">{{ m.vehicle_name || m.vehicle_id }}</td>
+            <td style="opacity: 0.9">{{ m.driver_name || '-' }}</td>
             <td>{{ m.incident_type }}</td>
             <td><span class="badge" :class="m.priority === 'critical' ? 'badge-red' : m.priority === 'high' ? 'badge-yellow' : 'badge-gray'">{{ m.priority }}</span></td>
             <td>{{ m.destination_name || 'N/A' }}</td>
-            <td>{{ m.eta_minutes ? m.eta_minutes + ' min' : '-' }}</td>
-            <td>{{ m.distance_km ? m.distance_km + ' km' : '-' }}</td>
+            <td style="font-family: monospace">{{ m.eta_minutes ? m.eta_minutes + ' min' : '-' }}</td>
+            <td style="font-family: monospace">{{ m.distance_km ? m.distance_km + ' km' : '-' }}</td>
             <td><span class="badge" :class="m.status === 'active' ? 'badge-green' : m.status === 'completed' ? 'badge-blue' : 'badge-gray'">{{ m.status }}</span></td>
-            <td style="font-size: 12px">{{ formatDate(m.started_at) }}</td>
+            <td style="font-size: 12px; text-align: right; opacity: 0.8">{{ formatDate(m.started_at) }}</td>
           </tr>
         </tbody>
       </table>

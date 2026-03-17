@@ -1,7 +1,12 @@
 <template>
   <aside class="sidebar">
+    <div class="mac-controls">
+      <div class="mac-dot red"></div>
+      <div class="mac-dot yellow"></div>
+      <div class="mac-dot green"></div>
+    </div>
     <div class="sidebar-brand">
-      <div class="brand-icon">P</div>
+      <img src="../assets/green_logo.png" alt="PULSE Logo" class="brand-icon-img" />
       <div>
         <div class="brand-name">PULSE</div>
         <div class="brand-sub">Super Admin</div>
@@ -24,6 +29,24 @@
     </nav>
 
     <div class="sidebar-footer">
+      <button class="theme-toggle-btn" @click="toggleTheme" title="Toggle Theme">
+        <svg v-if="!isLightMode" class="nav-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg v-else class="nav-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <span>{{ isLightMode ? 'Dark Mode' : 'Light Mode' }}</span>
+      </button>
+
       <div class="user-info">
         <div class="user-avatar">{{ user?.name?.[0] || 'A' }}</div>
         <div>
@@ -39,12 +62,29 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const user = computed(() => auth.user)
+
+const isLightMode = ref(false)
+
+onMounted(() => {
+  isLightMode.value = document.body.classList.contains('light-theme')
+})
+
+function toggleTheme() {
+  isLightMode.value = !isLightMode.value
+  if (isLightMode.value) {
+    document.body.classList.add('light-theme')
+    localStorage.setItem('theme', 'light')
+  } else {
+    document.body.classList.remove('light-theme')
+    localStorage.setItem('theme', 'dark')
+  }
+}
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: 'grid' },
@@ -73,7 +113,7 @@ function handleLogout() {
   display: flex;
   flex-direction: column;
   z-index: 50;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid var(--border);
 }
 
 .sidebar-brand {
@@ -81,24 +121,18 @@ function handleLogout() {
   align-items: center;
   gap: 12px;
   padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border);
 }
 
-.brand-icon {
-  width: 36px;
-  height: 36px;
-  background: var(--primary);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 800;
-  font-size: 16px;
+.brand-icon-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .brand-name {
-  color: white;
+  color: var(--text);
   font-weight: 700;
   font-size: 16px;
 }
@@ -129,13 +163,15 @@ function handleLogout() {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: white;
+  background: var(--sidebar-hover);
+  color: var(--text);
 }
 
 .nav-item.active {
-  background: var(--primary);
-  color: white;
+  background: var(--primary-bg);
+  color: var(--primary);
+  border-left: 3px solid var(--primary);
+  border-radius: 4px 8px 8px 4px;
 }
 
 .nav-icon-svg {
@@ -145,8 +181,37 @@ function handleLogout() {
 }
 
 .sidebar-footer {
-  padding: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 24px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  width: 100%;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sidebar-text);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--sidebar-hover);
+  color: var(--text);
+}
+.light-theme .theme-toggle-btn:hover {
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .user-info {
@@ -159,18 +224,19 @@ function handleLogout() {
 .user-avatar {
   width: 32px;
   height: 32px;
-  background: var(--primary);
+  background: var(--primary-bg);
+  border: 1px solid var(--primary);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--primary);
   font-weight: 700;
   font-size: 13px;
 }
 
 .user-name {
-  color: white;
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
 }
@@ -184,8 +250,8 @@ function handleLogout() {
 .logout-btn {
   width: 100%;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--sidebar-hover);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--sidebar-text);
   font-size: 13px;

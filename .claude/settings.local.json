@@ -8,7 +8,8 @@
       "Bash(python:*)",
       "Bash(pkill:*)",
       "Bash(npx vite:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(flutter pub:*)"
     ]
   }
 }

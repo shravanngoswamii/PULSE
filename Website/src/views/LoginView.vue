@@ -1,8 +1,14 @@
 <template>
   <div class="login-page">
-    <div class="login-card">
+    <div class="login-card window-glass">
+      <div class="mac-controls" style="padding: 0; margin-top: -10px; margin-bottom: 24px;">
+        <div class="mac-dot red"></div>
+        <div class="mac-dot yellow"></div>
+        <div class="mac-dot green"></div>
+      </div>
+      <img src="../assets/green_logo.png" alt="PULSE Logo" class="login-logo" />
       <h1>PULSE</h1>
-      <p class="subtitle">Super Admin Dashboard</p>
+      <p class="subtitle">System Access</p>
 
       <div v-if="error" class="login-error">{{ error }}</div>
 
@@ -54,3 +60,45 @@ async function handleLogin() {
   }
 }
 </script>
+
+<style scoped>
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg);
+  background-image: radial-gradient(circle at center, rgba(0, 230, 118, 0.05) 0%, transparent 70%);
+}
+
+.login-card {
+  background: var(--surface);
+  padding: 40px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 230, 118, 0.2);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.login-logo {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 16px;
+  filter: drop-shadow(0 0 10px rgba(0, 230, 118, 0.3));
+}
+
+h1 {
+  margin-bottom: 4px;
+  color: var(--primary);
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.subtitle {
+  color: var(--text-hint);
+  margin-bottom: 30px;
+}
+
+</style>

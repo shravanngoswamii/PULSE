@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  static const Color primary = Color(0xFF159A62);
-  static const Color secondary = Color(0xFF21C47A);
-  static const Color accent = Color(0xFF38E08A);
-  static const Color background = Color(0xFFF4F6F8);
+  static const Color primary = Color(0xFF10B981);
+  static const Color secondary = Color(0xFF059669);
+  static const Color accent = Color(0xFF34D399);
+  static const Color background = Color(0xFFF9FAFB);
   static const Color card = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF1A1F2B);
+  static const Color textPrimary = Color(0xFF111827);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color emergency = Color(0xFFEF4444);
-  static const Color corridorActive = Color(0xFF22C55E);
+  static const Color corridorActive = Color(0xFF10B981);
   static const Color border = Color(0xFFE5E7EB);
 }
 

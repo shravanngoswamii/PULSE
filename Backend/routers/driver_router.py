@@ -131,6 +131,8 @@ async def start_mission(req: MissionStartRequest, user: User = Depends(require_r
     db.refresh(mission)
 
     # Store visualization data for the live visualizer
+    # Include OSRM road coordinates for accurate map rendering
+    road_coords_list = [{"lat": c.lat, "lng": c.lng} for c in road_coords]
     live_missions_viz[mission.id] = {
         "mission_id": mission.id,
         "vehicle_id": req.vehicle_id,
@@ -143,6 +145,7 @@ async def start_mission(req: MissionStartRequest, user: User = Depends(require_r
         "intersection_path": intersection_path,
         "route_details": route_details,
         "algo_steps": algo_steps,
+        "road_coordinates": road_coords_list,
         "distance_km": distance_km,
         "eta_minutes": eta_minutes,
         "timestamp": datetime.now(timezone.utc).isoformat(),

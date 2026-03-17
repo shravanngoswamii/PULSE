@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:pulse_ev/config/app_theme.dart';
-import 'package:pulse_ev/core/services/location_service.dart';
+import 'package:pulse_ev/features/mission/models/mission_model.dart';
 import 'package:pulse_ev/features/mission/providers/mission_provider.dart';
 import 'package:pulse_ev/features/mission/screens/mission_setup_screen.dart';
 import 'package:pulse_ev/shared/widgets/app_button.dart';
@@ -26,17 +26,16 @@ class LiveMapScreen extends ConsumerWidget {
     }
 
     // No active mission - show plain map view
-    if (currentMission == null) {
-      return _buildNoMissionView(context, currentLatLng);
+    if (currentMission == null || currentMission.status != MissionStatus.active) {
+      return _buildNoMissionView(context, ref, currentLatLng);
     }
 
     // Active mission - show full HUD
     return _buildActiveMissionView(context, ref, currentMission, currentLatLng);
   }
 
-  Widget _buildNoMissionView(BuildContext context, LatLng? currentLatLng) {
+  Widget _buildNoMissionView(BuildContext context, WidgetRef ref, LatLng? currentLatLng) {
     final mapCenter = currentLatLng ?? const LatLng(22.7196, 75.8577);
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -98,11 +97,11 @@ class LiveMapScreen extends ConsumerWidget {
   }
 
   Widget _buildActiveMissionView(BuildContext context, WidgetRef ref, dynamic currentMission, LatLng? currentLatLng) {
-    // Build route coordinates from mission data
+    // Build route coordinates from mission data (backend sends [{lat, lng}] or [[lat, lng]])
     final routeCoords = <LatLng>[];
     for (final coord in currentMission.routeCoordinates) {
-      if (coord.length >= 2) {
-        routeCoords.add(LatLng(coord[0], coord[1]));
+      if (coord is List && coord.length >= 2) {
+        routeCoords.add(LatLng((coord[0] as num).toDouble(), (coord[1] as num).toDouble()));
       }
     }
 
@@ -112,35 +111,13 @@ class LiveMapScreen extends ConsumerWidget {
       currentMission.destinationHospital.lng,
     );
 
-    // Determine map center
+    // Determine map center: prefer current position, then route midpoint
     LatLng? mapCenter = currentLatLng ?? destinationLatLng;
     if (routeCoords.isNotEmpty) {
       mapCenter = routeCoords.first;
     }
 
-    // Build intersection markers along route
-    final intersectionMarkers = <Marker>[];
-    if (routeCoords.length > 2) {
-      // Show small circle markers at each intermediate route coordinate
-      for (int i = 1; i < routeCoords.length - 1; i++) {
-        intersectionMarkers.add(
-          Marker(
-            point: routeCoords[i],
-            width: 12,
-            height: 12,
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.7),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
-              ),
-            ),
-          ),
-        );
-      }
-    }
-
-    // Build a thicker green route polyline
+    // Build route polyline (no dots - OSRM returns hundreds of points)
     final routePolylines = <Polyline>[];
     if (routeCoords.isNotEmpty) {
       routePolylines.add(
@@ -166,61 +143,53 @@ class LiveMapScreen extends ConsumerWidget {
       ),
       body: Stack(
         children: [
-          // Map with custom polylines and intersection markers
+          // Map with route polyline
           PulseMap(
             center: mapCenter,
             currentPosition: currentLatLng,
-            routeCoordinates: const [], // We handle polylines ourselves
+            routeCoordinates: const [],
             polylines: routePolylines,
-            mapMarkers: intersectionMarkers,
             destinationPosition: destinationLatLng,
             destinationLabel: currentMission.destinationHospital.name,
           ),
 
           // Top Header Layer (HUD)
           Positioned(
-            top: 16,
-            left: 16,
-            right: 16,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                 Container(
-                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                   decoration: BoxDecoration(
-                     color: Colors.white,
-                     borderRadius: BorderRadius.circular(20),
-                     boxShadow: [
-                       BoxShadow(
-                         color: Colors.black.withValues(alpha: 0.1),
-                         blurRadius: 4,
-                         offset: const Offset(0, 2),
-                       ),
-                     ],
-                   ),
-                   child: Row(
-                     children: [
-                       const Icon(Icons.my_location, size: 14, color: AppColors.primary),
-                       const SizedBox(width: 4),
-                       Text('LIVE', style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                     ],
-                   ),
-                 ),
-                 const SizedBox.shrink(),
-              ],
+            top: 12,
+            left: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.my_location, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 4),
+                  Text('LIVE', style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
           ),
 
-          // Bottom HUD Layer
+          // Bottom HUD Layer - compact
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
               decoration: BoxDecoration(
                 color: AppColors.background,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.1),
@@ -232,75 +201,125 @@ class LiveMapScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Mission Stats Card
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('MISSION PROGRESS', style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold)),
-                    ],
+                  // Drag handle
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatItem('DISTANCE', '${currentMission.distance.toStringAsFixed(1)} km'),
-                      _buildStatItem('SIGNALS', '${currentMission.signalsCleared} Cleared'),
-                      _buildStatItem('ETA', currentMission.eta),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                  // Destination info
+                  // Distance + ETA in one compact row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(Icons.route, size: 16, color: AppColors.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${currentMission.distance.toStringAsFixed(1)} km',
+                              style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(Icons.schedule, size: 16, color: AppColors.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              currentMission.eta,
+                              style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${currentMission.signalsCleared} signals',
+                          style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Compact destination card
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColors.border),
                     ),
                     child: Row(
                       children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.local_hospital, color: AppColors.primary, size: 18),
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('DESTINATION', style: AppTextStyles.micro),
-                              const SizedBox(height: 4),
                               Text(
                                 currentMission.destinationHospital.name,
-                                style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold),
+                                style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                overflow: TextOverflow.ellipsis,
                               ),
                               Text(
                                 'Green Corridor Active',
-                                style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                style: AppTextStyles.micro.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600),
                               ),
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.traffic, color: AppColors.primary),
-                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
 
                   // End Mission Button
-                  AppButton(
-                    text: 'END MISSION',
-                    variant: ButtonVariant.emergency,
-                    onPressed: () async {
-                      await ref.read(missionProvider.notifier).endMission();
-                      if (context.mounted) {
-                        context.go('/mission/summary');
-                      }
-                    },
+                  SizedBox(
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await ref.read(missionProvider.notifier).endMission();
+                        if (context.mounted) {
+                          context.go('/mission/summary');
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.emergency,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.stop_circle_outlined, size: 18),
+                          const SizedBox(width: 6),
+                          Text('END MISSION', style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -308,15 +327,6 @@ class LiveMapScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(label, style: AppTextStyles.micro),
-        Text(value, style: AppTextStyles.label.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-      ],
     );
   }
 }
