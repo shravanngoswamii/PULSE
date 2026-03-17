@@ -25,9 +25,14 @@ class LiveMapScreen extends ConsumerWidget {
       currentLatLng = LatLng(position.latitude, position.longitude);
     }
 
-    // No active mission - show plain map view
-    if (currentMission == null || currentMission.status != MissionStatus.active) {
+    // No mission at all
+    if (currentMission == null) {
       return _buildNoMissionView(context, ref, currentLatLng);
+    }
+
+    // Mission just completed (auto-drive finished) — show completion overlay
+    if (currentMission.status == MissionStatus.completed) {
+      return _buildMissionCompleteView(context, ref, currentMission, currentLatLng);
     }
 
     // Active mission - show full HUD
@@ -93,6 +98,95 @@ class LiveMapScreen extends ConsumerWidget {
               text: 'START MISSION',
               variant: ButtonVariant.primary,
               onPressed: () => context.go('/mission/setup'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMissionCompleteView(BuildContext context, WidgetRef ref, dynamic mission, LatLng? currentLatLng) {
+    final destinationLatLng = LatLng(mission.destinationHospital.lat, mission.destinationHospital.lng);
+    final mapCenter = destinationLatLng;
+
+    // Build route polyline from mission data
+    final routeCoords = <LatLng>[];
+    for (final coord in mission.routeCoordinates) {
+      if (coord is List && coord.length >= 2) {
+        routeCoords.add(LatLng((coord[0] as num).toDouble(), (coord[1] as num).toDouble()));
+      }
+    }
+    final routePolylines = <Polyline>[];
+    if (routeCoords.length > 2) {
+      routePolylines.add(Polyline(points: routeCoords, strokeWidth: 5.0, color: AppColors.primary.withValues(alpha: 0.5)));
+    }
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          PulseMap(
+            center: mapCenter,
+            zoom: 15.0,
+            currentPosition: destinationLatLng,
+            polylines: routePolylines,
+            destinationPosition: destinationLatLng,
+            destinationLabel: mission.destinationHospital.name,
+          ),
+          // Success overlay
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, -8))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 36),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Mission Complete', style: AppTextStyles.sectionTitle.copyWith(fontSize: 20)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Arrived at ${mission.destinationHospital.name}',
+                    style: AppTextStyles.micro.copyWith(color: AppColors.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${mission.signalsCleared} signals cleared',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 18),
+                  AppButton(
+                    text: 'NEW MISSION',
+                    variant: ButtonVariant.primary,
+                    onPressed: () {
+                      ref.read(missionProvider.notifier).endMission();
+                      context.go('/mission/setup');
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      ref.read(missionProvider.notifier).endMission();
+                      context.go('/dashboard');
+                    },
+                    child: Text('Back to Dashboard', style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -271,7 +365,9 @@ class LiveMapScreen extends ConsumerWidget {
                               Icon(Icons.route_rounded, size: 20, color: AppColors.primary),
                               const SizedBox(height: 6),
                               Text(
-                                '${currentMission.distance.toStringAsFixed(1)} km',
+                                currentMission.distance < 1
+                                    ? '${(currentMission.distance * 1000).toInt()} m'
+                                    : '${currentMission.distance.toStringAsFixed(1)} km',
                                 style: AppTextStyles.sectionTitle.copyWith(fontSize: 18),
                               ),
                               Text('Distance', style: AppTextStyles.micro),

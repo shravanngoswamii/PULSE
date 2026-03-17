@@ -215,7 +215,19 @@ document.addEventListener('click',e=>{if(!e.target.closest('.search-box'))docume
 async function rg(lat,lng){try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,{headers:{'User-Agent':'PULSE'}});const d=await r.json();return d.display_name?.split(',').slice(0,2).join(', ');}catch(e){return null;}}
 
 // ─── Graph loading ───
-async function loadGraph(){try{const r=await fetch(API+'/api/visualizer/graph');const d=await r.json();gN=d.nodes;gE=d.edges;drawTrafficOverlay();}catch(e){console.error('Graph load failed',e);}}
+let hospitalMarkers=[];
+async function loadGraph(){try{const r=await fetch(API+'/api/visualizer/graph');const d=await r.json();gN=d.nodes;gE=d.edges;drawTrafficOverlay();if(d.hospitals)drawHospitals(d.hospitals);}catch(e){console.error('Graph load failed',e);}}
+
+function drawHospitals(hospitals){
+  hospitalMarkers.forEach(m=>map.removeLayer(m));hospitalMarkers=[];
+  hospitals.forEach(h=>{
+    const icon=L.divIcon({className:'',html:`<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:#fff;border:2px solid #EF4444;border-radius:50%;box-shadow:0 2px 8px rgba(239,68,68,.4);cursor:pointer"><span style="font-size:16px">🏥</span></div>`,iconSize:[28,28],iconAnchor:[14,14]});
+    const m=L.marker([h.lat,h.lng],{icon:icon,zIndexOffset:500}).addTo(map);
+    m.bindTooltip(`<div style="font-size:12px;font-weight:700;color:#1E293B">${h.name}</div><div style="font-size:10px;color:#64748B">${h.address||''}</div>${h.phone?'<div style="font-size:10px;color:#3B82F6">'+h.phone+'</div>':''}`,{direction:'top',offset:[0,-16],className:''});
+    m.bindPopup(`<div style="min-width:180px"><b style="font-size:13px;color:#EF4444">🏥 ${h.name}</b><br><span style="font-size:11px;color:#475569">${h.address||''}</span>${h.phone?'<br><span style="font-size:11px;color:#3B82F6">📞 '+h.phone+'</span>':''}</div>`);
+    hospitalMarkers.push(m);
+  });
+}
 
 function congestionColor(level){return level==='high'?'#EF4444':level==='moderate'?'#F59E0B':'#10B981';}
 function densityColor(d){if(d>15)return '#EF4444';if(d>7)return '#F59E0B';return '#10B981';}
@@ -310,9 +322,11 @@ function handleNew(d){
   if(document.getElementById('mc-'+d.mission_id)){document.getElementById('mc-'+d.mission_id)._d=d;return;}
   const c=document.createElement('div');c.className='mc';c.id='mc-'+d.mission_id;
   const bc=d.priority==='critical'?'badge-critical':d.priority==='high'?'badge-high':'badge-standard';
-  c.innerHTML=`<div class="row"><span class="id">${d.mission_id}</span><span class="badge ${bc}">${d.priority}</span></div><div class="info">${d.vehicle_type||''} ${d.vehicle_id} | ${d.driver_name||''}</div><div class="info">${d.incident_type||''} &rarr; ${d.destination?.name||'?'}</div><div class="sts"><b>${d.distance_km||0} km</b> | <b>${d.eta_minutes||0} min</b></div><div class="btns"><button class="rbtn" onclick="event.stopPropagation();replayLiveM('${d.mission_id}')">&#9654; Replay</button><button class="rbtn" style="background:linear-gradient(135deg,#10B981,#059669);color:#fff" onclick="event.stopPropagation();compareLiveM('${d.mission_id}')">⚡ Compare</button></div>`;
+  const doneBadge=d.completed?'<span class="badge" style="background:#334155;color:#94A3B8;font-size:9px;padding:2px 6px;border-radius:6px;font-weight:700;margin-left:4px">DONE</span>':'';
+  c.innerHTML=`<div class="row"><span class="id">${d.mission_id}</span><span class="badge ${bc}">${d.priority}</span>${doneBadge}</div><div class="info">${d.vehicle_type||''} ${d.vehicle_id} | ${d.driver_name||''}</div><div class="info">${d.incident_type||''} &rarr; ${d.destination?.name||'?'}</div><div class="sts"><b>${d.distance_km||0} km</b> | <b>${d.eta_minutes||0} min</b></div><div class="btns"><button class="rbtn" onclick="event.stopPropagation();replayLiveM('${d.mission_id}')">&#9654; Replay</button><button class="rbtn" style="background:linear-gradient(135deg,#10B981,#059669);color:#fff" onclick="event.stopPropagation();compareLiveM('${d.mission_id}')">⚡ Compare</button></div>`;
+  if(d.completed)c.style.opacity='.6';
   c.onclick=()=>showLiveM(d.mission_id);c._d=d;list.prepend(c);
-  switchTab('live');showLiveM(d.mission_id);
+  if(!d.completed){switchTab('live');showLiveM(d.mission_id);}
 }
 function showLiveM(mid){
   const card=document.getElementById('mc-'+mid);if(!card||!card._d)return;const d=card._d;
@@ -320,10 +334,49 @@ function showLiveM(mid){
   rstViz();
   const math=document.getElementById('livemath');math.style.display='block';
   const body=document.getElementById('lmb');body.innerHTML='';
-  if(d.origin)vizMarkers.push(L.circleMarker([d.origin.lat,d.origin.lng],{radius:10,fillColor:'#EF4444',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindTooltip('START',{permanent:true,direction:'top',offset:[0,-8]}));
-  if(d.destination)vizMarkers.push(L.circleMarker([d.destination.lat,d.destination.lng],{radius:10,fillColor:'#3B82F6',color:'#fff',weight:2,fillOpacity:1}).addTo(map).bindTooltip(d.destination.name||'END',{permanent:true,direction:'top',offset:[0,-8]}));
-  if(d.road_coordinates&&d.road_coordinates.length>0){const rc=d.road_coordinates.map(c=>[c.lat,c.lng]);drawHighVisPath(rc);map.fitBounds(roadPl.getBounds().pad(.15));}
-  else if(d.origin&&d.destination)map.fitBounds([[d.origin.lat,d.origin.lng],[d.destination.lat,d.destination.lng]],{padding:[50,50],maxZoom:14});
+
+  // Origin marker
+  if(d.origin)vizMarkers.push(L.circleMarker([d.origin.lat,d.origin.lng],{radius:12,fillColor:'#EF4444',color:'#fff',weight:3,fillOpacity:1}).addTo(map).bindTooltip('START',{permanent:true,direction:'top',offset:[0,-10],className:''}));
+  // Destination marker
+  if(d.destination)vizMarkers.push(L.circleMarker([d.destination.lat,d.destination.lng],{radius:12,fillColor:'#3B82F6',color:'#fff',weight:3,fillOpacity:1}).addTo(map).bindTooltip(d.destination.name||'END',{permanent:true,direction:'top',offset:[0,-10],className:''}));
+
+  // Draw corridor intersection nodes in green with connecting lines
+  const iPath=d.intersection_path||[];
+  if(iPath.length>1){
+    for(let i=0;i<iPath.length-1;i++){
+      const a=gN[iPath[i]],b=gN[iPath[i+1]];
+      if(a&&b){
+        const el=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#10B981',weight:3,opacity:.5,dashArray:'6 4'}).addTo(map);
+        vizEdges.push(el);
+      }
+    }
+  }
+  iPath.forEach(nid=>{
+    const nd=gN[nid];
+    if(nd){
+      const m=L.circleMarker([nd.lat,nd.lng],{radius:8,fillColor:'#10B981',color:'#fff',weight:2,fillOpacity:.9}).addTo(map);
+      m.bindTooltip(`<b style="color:#10B981">🟢 ${nd.name||nid}</b><br><span style="font-size:9px;color:#94A3B8">Signal: GREEN</span>`,{direction:'top',offset:[0,-8]});
+      vizMarkers.push(m);
+    }
+  });
+
+  // Draw OSRM road path as the green corridor
+  if(d.road_coordinates&&d.road_coordinates.length>0){
+    const rc=d.road_coordinates.map(c=>[c.lat,c.lng]);
+    drawHighVisPath(rc,{color:'#10B981',weight:7});
+    map.fitBounds(roadPl.getBounds().pad(.15));
+  } else if(d.origin&&d.destination){
+    map.fitBounds([[d.origin.lat,d.origin.lng],[d.destination.lat,d.destination.lng]],{padding:[50,50],maxZoom:14});
+  }
+
+  // Create vehicle marker (animated dot) if not already exists
+  if(!vm[mid]&&d.origin){
+    const vIcon=L.divIcon({className:'',html:`<div style="width:18px;height:18px;background:#F59E0B;border:3px solid #fff;border-radius:50%;box-shadow:0 0 12px rgba(245,158,11,.6),0 0 24px rgba(245,158,11,.3);animation:p 1s infinite"></div>`,iconSize:[18,18],iconAnchor:[9,9]});
+    vm[mid]=L.marker([d.origin.lat,d.origin.lng],{icon:vIcon,zIndexOffset:1000}).addTo(map);
+    vm[mid].bindTooltip(`<b>${d.vehicle_type||'Vehicle'}</b> ${d.vehicle_id||''}`,{direction:'top',offset:[0,-12],permanent:false});
+    vizMarkers.push(vm[mid]);
+  }
+
   logSteps(body,d.algo_steps||[],d);
 }
 async function replayLiveM(mid){
@@ -366,8 +419,37 @@ function logSteps(body,steps,d){
   }
   if(d.road_coordinates&&d.road_coordinates.length>0)ml(body,`<span class="s">OSRM</span> <span class="h">Road: ${d.distance_km} km, ${d.eta_minutes} min</span>`);
 }
-function handleMv(d){if(vm[d.mission_id])vm[d.mission_id].setLatLng([d.lat,d.lng]);}
-function handleDn(d){const c=document.getElementById('mc-'+d.mission_id);if(c)c.style.opacity='.3';}
+function handleMv(d){
+  if(vm[d.mission_id]){
+    vm[d.mission_id].setLatLng([d.lat,d.lng]);
+  } else {
+    // Create vehicle marker on first move event (e.g. page loaded mid-mission)
+    const vIcon=L.divIcon({className:'',html:`<div style="width:18px;height:18px;background:#F59E0B;border:3px solid #fff;border-radius:50%;box-shadow:0 0 12px rgba(245,158,11,.6),0 0 24px rgba(245,158,11,.3);animation:p 1s infinite"></div>`,iconSize:[18,18],iconAnchor:[9,9]});
+    vm[d.mission_id]=L.marker([d.lat,d.lng],{icon:vIcon,zIndexOffset:1000}).addTo(map);
+    vizMarkers.push(vm[d.mission_id]);
+  }
+}
+function handleDn(d){
+  const c=document.getElementById('mc-'+d.mission_id);
+  if(c){
+    c.style.opacity='.5';
+    const row=c.querySelector('.row');
+    if(row&&!row.querySelector('.badge-done')){
+      const b=document.createElement('span');
+      b.className='badge badge-done';
+      b.style.cssText='background:#334155;color:#94A3B8;font-size:9px;padding:2px 6px;border-radius:6px;font-weight:700;margin-left:4px';
+      b.textContent='DONE';
+      row.appendChild(b);
+    }
+  }
+  // Remove vehicle marker
+  if(vm[d.mission_id]){
+    map.removeLayer(vm[d.mission_id]);
+    const idx=vizMarkers.indexOf(vm[d.mission_id]);
+    if(idx>=0)vizMarkers.splice(idx,1);
+    delete vm[d.mission_id];
+  }
+}
 
 // ─── Algorithm Comparison ───
 async function runCompare(){
@@ -448,7 +530,7 @@ async function replayAlgo(algoKey){
 
 // ─── Utils ───
 function rstM(){running=false;rstViz();mO=null;mD=null;if(mOM){map.removeLayer(mOM);mOM=null;}if(mDM){map.removeLayer(mDM);mDM=null;}document.getElementById('ol').textContent='Click map';document.getElementById('ol').style.color='#94A3B8';document.getElementById('dl').textContent='Click map';document.getElementById('dl').style.color='#94A3B8';document.getElementById('btnR').disabled=true;document.getElementById('cmpResult').innerHTML='';document.getElementById('liveCmpResult').innerHTML='';}
-function rstViz(){vizMarkers.forEach(m=>map.removeLayer(m));vizMarkers=[];vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];if(roadPl){map.removeLayer(roadPl);roadPl=null;}if(glowPl){map.removeLayer(glowPl);glowPl=null;}}
+function rstViz(){vizMarkers.forEach(m=>map.removeLayer(m));vizMarkers=[];vizEdges.forEach(l=>map.removeLayer(l));vizEdges=[];if(roadPl){map.removeLayer(roadPl);roadPl=null;}if(glowPl){map.removeLayer(glowPl);glowPl=null;}Object.keys(vm).forEach(k=>{if(vm[k]){map.removeLayer(vm[k]);}});vm={};}
 function ml(el,h){el.innerHTML=`<div class="ms">${h}</div>`+el.innerHTML;}
 function slp(ms){return new Promise(r=>setTimeout(r,ms));}
 async function loadEx(){try{const r=await fetch(API+'/api/driver/viz/missions');const m=await r.json();m.forEach(d=>handleNew(d));}catch(e){}}

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../shared/widgets/pulse_card.dart';
-import '../../../shared/widgets/status_badge.dart';
 import '../dashboard_controller.dart';
 
 class SystemStatusCard extends StatelessWidget {
@@ -32,15 +31,10 @@ class SystemStatusCard extends StatelessWidget {
             iconColor: Colors.white,
             iconBg: AppColors.danger,
             title: 'Active Emergencies',
-            value: StatusBadge(type: BadgeType.high), // Value is handled by Badge widget internally for label
-            // Wait, Part 1 StatusBadge has hardcoded labels based on type.
-            // Let me check if I can pass count. 
-            // The requirement says: StatusBadge showing count "2" (red background, white text)
-            // But Part 1 StatusBadge handles label based on BadgeType enum.
-            // I might need to tweak StatusBadge if it doesn't support custom labels, but I'm NOT allowed to modify Part 1.
-            // Re-reading Part 1: StatusBadge labels are HIGH, MEDIUM, LOW, LIVE, ONLINE, PENDING.
-            // Actually, I can just use a custom Container if I must, or wrap it.
-            // Let's look at the StatusBadge implementation from Part 1 again.
+            value: _CountBadge(
+              count: status.activeEmergencies,
+              color: AppColors.danger,
+            ),
           ),
           const Divider(height: 1, thickness: 0.5, color: AppColors.border),
           _StatusRow(
@@ -48,7 +42,10 @@ class SystemStatusCard extends StatelessWidget {
             iconColor: Colors.white,
             iconBg: AppColors.amber,
             title: 'Congested Roads',
-            value: StatusBadge(type: BadgeType.medium),
+            value: _CountBadge(
+              count: status.congestedRoads,
+              color: AppColors.amber,
+            ),
           ),
           const Divider(height: 1, thickness: 0.5, color: AppColors.border),
           _StatusRow(
@@ -62,6 +59,31 @@ class SystemStatusCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CountBadge extends StatelessWidget {
+  final int count;
+  final Color color;
+
+  const _CountBadge({required this.count, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '$count',
+        style: AppTypography.labelMedium.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

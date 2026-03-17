@@ -19,8 +19,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _authorityIdController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _authorityIdController = TextEditingController(text: 'operator@pulse.com');
+  final _passwordController = TextEditingController(text: 'password123');
 
   @override
   void dispose() {

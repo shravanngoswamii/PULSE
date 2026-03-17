@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from config import CORS_ORIGINS, HOST, PORT
 from database import engine, Base, get_db
-from models import Edge, Intersection
+from models import Edge, Intersection, Hospital
 from routers import auth_router, driver_router, operator_router, admin_router, edge_router
 from websocket_manager import manager
 from traffic_simulator import simulator
@@ -88,7 +88,10 @@ def get_graph_data(db: Session = Depends(get_db)):
     nodes = {i.id: {"lat": i.lat, "lng": i.lng, "name": i.name, "district": i.district} for i in intersections}
     edge_list = [{"from_id": e.from_id, "to_id": e.to_id, "weight": e.current_weight, "base": e.base_travel_time, "distance_m": e.distance_meters} for e in edges_db]
 
-    return {"nodes": nodes, "edges": edge_list}
+    hospitals = db.query(Hospital).all()
+    hospital_list = [{"id": h.id, "name": h.name, "lat": h.lat, "lng": h.lng, "address": h.address, "phone": h.phone} for h in hospitals]
+
+    return {"nodes": nodes, "edges": edge_list, "hospitals": hospital_list}
 
 
 @app.get("/api/visualizer/compare")

@@ -31,6 +31,9 @@ class ActiveMission extends Equatable {
   final DateTime estimatedArrival;
   final MissionStatus status;
   final List<MissionEvent> eventLog;
+  /// Road coordinates for rendering the route polyline on maps.
+  /// Each entry is [lat, lng].
+  final List<List<double>> roadCoordinates;
 
   const ActiveMission({
     required this.id,
@@ -41,6 +44,7 @@ class ActiveMission extends Equatable {
     required this.estimatedArrival,
     required this.status,
     required this.eventLog,
+    this.roadCoordinates = const [],
   });
 
   ActiveMission copyWith({
@@ -52,6 +56,7 @@ class ActiveMission extends Equatable {
     DateTime? estimatedArrival,
     MissionStatus? status,
     List<MissionEvent>? eventLog,
+    List<List<double>>? roadCoordinates,
   }) {
     return ActiveMission(
       id: id ?? this.id,
@@ -62,6 +67,7 @@ class ActiveMission extends Equatable {
       estimatedArrival: estimatedArrival ?? this.estimatedArrival,
       status: status ?? this.status,
       eventLog: eventLog ?? this.eventLog,
+      roadCoordinates: roadCoordinates ?? this.roadCoordinates,
     );
   }
 
@@ -75,5 +81,6 @@ class ActiveMission extends Equatable {
         estimatedArrival,
         status,
         eventLog,
+        roadCoordinates,
       ];
 }

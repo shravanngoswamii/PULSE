@@ -35,10 +35,14 @@ class AuthService {
             await _storage.write('user_role', role);
           }
 
-          // Store user name if present
+          // Store user name and ID if present
           final name = user?['name'] as String? ?? data['name'] as String?;
           if (name != null) {
             await _storage.write('user_name', name);
+          }
+          final userId = user?['id'] as String? ?? data['id'] as String?;
+          if (userId != null) {
+            await _storage.write('user_id', userId);
           }
 
           return role ?? 'operator';
@@ -67,6 +71,7 @@ class AuthService {
     await _storage.delete('officer_id');
     await _storage.delete('user_role');
     await _storage.delete('user_name');
+    await _storage.delete('user_id');
   }
 
   Future<bool> isLoggedIn() async {
@@ -80,6 +85,10 @@ class AuthService {
 
   Future<String?> getUserName() async {
     return await _storage.read('user_name');
+  }
+
+  Future<String?> getUserId() async {
+    return await _storage.read('user_id');
   }
 }
 

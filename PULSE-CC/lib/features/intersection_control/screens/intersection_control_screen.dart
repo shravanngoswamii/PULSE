@@ -83,13 +83,18 @@ class IntersectionControlScreen extends ConsumerWidget {
                     valueWidget: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('Automatic  ', style: AppTypography.bodyMedium),
+                        Text('${intersection.signalMode.name.toUpperCase()}  ', style: AppTypography.bodyMedium),
                         _buildModeBadge(intersection.signalMode),
                       ],
                     ),
                   ),
                   const Divider(height: 24, color: AppColors.border),
-                  _MetadataRow(label: 'LAST OVERRIDE', value: 'None'),
+                  _MetadataRow(
+                    label: 'CURRENT PHASE',
+                    valueWidget: _buildPhaseDot(intersection.currentPhase),
+                  ),
+                  const Divider(height: 24, color: AppColors.border),
+                  _MetadataRow(label: 'VEHICLES WAITING', value: '${intersection.vehiclesWaiting}'),
                 ],
               ),
             ),
@@ -190,6 +195,34 @@ class IntersectionControlScreen extends ConsumerWidget {
       ),
       bottomNavigationBar: const PulseBottomNav(currentIndex: 2), 
     ),);
+  }
+
+  Widget _buildPhaseDot(SignalPhase phase) {
+    Color color;
+    switch (phase) {
+      case SignalPhase.green:
+        color = AppColors.signalGreen;
+        break;
+      case SignalPhase.red:
+        color = Colors.red;
+        break;
+      case SignalPhase.amber:
+        color = Colors.amber;
+        break;
+      default:
+        color = Colors.grey;
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12, height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(phase.name.toUpperCase(), style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500)),
+      ],
+    );
   }
 
   Widget _buildModeBadge(SignalMode mode) {

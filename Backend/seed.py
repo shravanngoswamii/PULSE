@@ -158,6 +158,7 @@ def seed():
 
     # ── Hospitals ───────────────────────────────────────────────────
     hospitals = [
+        # Central Indore
         Hospital(name="MY Hospital (Govt)", lat=22.7175, lng=75.8558, address="MY Hospital Road, Indore", phone="+91-731-2527383"),
         Hospital(name="Bombay Hospital Indore", lat=22.7515, lng=75.8770, address="Ring Road, Indore", phone="+91-731-2581111"),
         Hospital(name="CHL Hospital", lat=22.7380, lng=75.8930, address="AB Road, Scheme 54, Indore", phone="+91-731-2550100"),
@@ -170,6 +171,17 @@ def seed():
         Hospital(name="Greater Kailash Hospital", lat=22.7310, lng=75.8800, address="LIG Colony, Indore", phone="+91-731-2490300"),
         Hospital(name="Apollo Rajshree Hospital", lat=22.7390, lng=75.8650, address="Opposite High Court, Indore", phone="+91-731-2573333"),
         Hospital(name="Vishesh Hospital", lat=22.7280, lng=75.8570, address="Yeshwant Colony, Indore", phone="+91-731-4066666"),
+        # Expanded Indore coverage
+        Hospital(name="Maharaja Yeshwantrao Hospital", lat=22.7168, lng=75.8545, address="Indore-Dhar Road, Indore", phone="+91-731-2527383"),
+        Hospital(name="Arihant Hospital", lat=22.7450, lng=75.8650, address="Mangal Nagar, AB Road, Indore", phone="+91-731-2580300"),
+        Hospital(name="Bhandari Hospital", lat=22.7350, lng=75.8780, address="Scheme 74-C, Indore", phone="+91-731-4710000"),
+        Hospital(name="Life Care Hospital", lat=22.7600, lng=75.8850, address="Bicholi Mardana, Indore", phone="+91-731-2725600"),
+        Hospital(name="Central India Hospital", lat=22.7100, lng=75.8780, address="RNT Marg, Indore", phone="+91-731-2510700"),
+        Hospital(name="Barwale Hospital", lat=22.6750, lng=75.8550, address="Mhow Naka, Indore", phone="+91-731-2760800"),
+        Hospital(name="Care CHL Hospital", lat=22.7650, lng=75.9200, address="Scheme 78, Vijay Nagar, Indore", phone="+91-731-4710100"),
+        Hospital(name="Shalby Hospital", lat=22.7480, lng=75.9150, address="Vijay Nagar, Indore", phone="+91-731-4980000"),
+        Hospital(name="Chirayu Medical College", lat=22.7740, lng=75.8900, address="Bhanwarkuan-Sanwer Road, Indore", phone="+91-731-4988777"),
+        Hospital(name="St. Francis Hospital", lat=22.7220, lng=75.8450, address="South Tukoganj, Indore", phone="+91-731-2522844"),
     ]
     db.add_all(hospitals)
     db.commit()

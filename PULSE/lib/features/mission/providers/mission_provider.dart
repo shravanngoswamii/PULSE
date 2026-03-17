@@ -212,8 +212,37 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
             final simLat = (response['current_lat'] as num?)?.toDouble();
             final simLng = (response['current_lng'] as num?)?.toDouble();
 
+            // Check if backend has auto-completed the mission,
+            // OR if distance/ETA are effectively zero (vehicle arrived)
+            final missionStatus = response['status'] as String?;
+            final arrivedByDistance = (updatedDistance != null && updatedDistance < 0.05)
+                && (updatedEta != null && updatedEta < 0.3);
+            if (missionStatus == 'completed' || arrivedByDistance) {
+              _stopGpsTracking();
+              state = state!.copyWith(
+                status: MissionStatus.completed,
+                distance: 0,
+                eta: 'Arrived',
+                signalsCleared: updatedSignals,
+                currentLat: simLat,
+                currentLng: simLng,
+              );
+              _ref.invalidate(dashboardProvider);
+              return;
+            }
+
+            // Format ETA/distance with enough precision for small values
+            String? etaText;
+            if (updatedEta != null) {
+              if (updatedEta < 1) {
+                etaText = '${(updatedEta * 60).toInt()} sec';
+              } else {
+                etaText = '${updatedEta.toStringAsFixed(1)} min';
+              }
+            }
+
             state = state!.copyWith(
-              eta: updatedEta != null ? '${updatedEta.toInt()} min' : null,
+              eta: etaText,
               distance: updatedDistance,
               signalsCleared: updatedSignals,
               routeCoordinates: updatedRoute,

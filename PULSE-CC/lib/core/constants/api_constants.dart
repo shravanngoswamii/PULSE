@@ -1,13 +1,23 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiConstants {
   ApiConstants._();
 
-  static String get baseUrl =>
-      kIsWeb ? 'http://localhost:9000/api' : 'http://10.0.2.2:9000/api';
+  static String get _host {
+    if (kIsWeb) return 'localhost';
+    // Android emulator uses 10.0.2.2 to reach host machine;
+    // iOS simulator uses localhost directly.
+    try {
+      return Platform.isAndroid ? '10.0.2.2' : 'localhost';
+    } catch (_) {
+      return 'localhost';
+    }
+  }
 
-  static String get wsUrl =>
-      kIsWeb ? 'ws://localhost:9000/ws/operator' : 'ws://10.0.2.2:9000/ws/operator';
+  static String get baseUrl => 'http://$_host:9000/api';
+
+  static String get wsUrl => 'ws://$_host:9000/ws/operator';
 
   static const Duration requestTimeout = Duration(seconds: 30);
   static const Duration wsReconnectDelay = Duration(seconds: 5);

@@ -55,7 +55,10 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
               ),
               // Corridor polylines
               if (state.showEmergencyVehicles)
-                CorridorOverlay.getCorridorLayer(state.activeMissions),
+                CorridorOverlay.getCorridorLayer(
+                  state.activeMissions,
+                  intersections: state.intersections,
+                ),
               // Vehicle markers
               if (state.showEmergencyVehicles)
                 MarkerLayer(

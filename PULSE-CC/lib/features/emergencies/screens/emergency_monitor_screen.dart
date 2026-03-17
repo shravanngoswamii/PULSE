@@ -11,6 +11,7 @@ import '../../../shared/widgets/pulse_bottom_nav.dart';
 import '../../../shared/widgets/pulse_card.dart';
 import '../../../data/models/emergency_vehicle.dart';
 import '../../../data/models/active_mission.dart';
+import '../../../data/models/intersection.dart' as imodel;
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/section_label.dart';
 import '../../../shared/widgets/loading_overlay.dart';
@@ -18,7 +19,7 @@ import '../../../shared/widgets/eta_chip.dart';
 import '../emergency_controller.dart';
 import '../widgets/mission_header_card.dart';
 import '../widgets/junction_clearance_column.dart';
-import '../widgets/event_timeline.dart';
+import '../../dashboard/dashboard_controller.dart';
 
 class EmergencyMonitorScreen extends ConsumerWidget {
   const EmergencyMonitorScreen({super.key});
@@ -26,7 +27,7 @@ class EmergencyMonitorScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(emergencyControllerProvider);
-    final controller = ref.read(emergencyControllerProvider.notifier);
+    final dashState = ref.watch(dashboardControllerProvider);
 
     final primaryMission = state.primaryMission;
 
@@ -49,6 +50,17 @@ class EmergencyMonitorScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
 
+            if (state.activeMissions.isEmpty)
+              PulseCard(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    'No active missions',
+                    style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  ),
+                ),
+              ),
+
             if (primaryMission != null)
               MissionHeaderCard(mission: primaryMission),
 
@@ -70,6 +82,7 @@ class EmergencyMonitorScreen extends ConsumerWidget {
 
             const SizedBox(height: 20),
 
+            // Real-time map with actual vehicle positions and intersection markers
             PulseCard(
               padding: EdgeInsets.zero,
               child: ClipRRect(
@@ -79,100 +92,67 @@ class EmergencyMonitorScreen extends ConsumerWidget {
                   child: Stack(
                     children: [
                       FlutterMap(
-                        options: const MapOptions(
-                          initialCenter: LatLng(22.7196, 75.8577),
+                        options: MapOptions(
+                          initialCenter: _getMapCenter(state.activeMissions),
                           initialZoom: 14.0,
                         ),
                         children: [
                           TileLayer(
                             urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.pulse.ta',
-                tileProvider: CancellableNetworkTileProvider(),
+                            tileProvider: CancellableNetworkTileProvider(),
                           ),
-                          PolylineLayer(
-                            polylines: [
-                              Polyline(
-                                points: const [
-                                  LatLng(22.7134, 75.8621),
-                                  LatLng(22.7196, 75.8577),
-                                  LatLng(22.7299, 75.8656),
-                                ],
-                                color: AppColors.primary,
-                                strokeWidth: 5,
-                              ),
-                            ],
-                          ),
+                          // Route polylines for active missions using intersection coordinates
+                          if (primaryMission != null)
+                            PolylineLayer(
+                              polylines: [
+                                _buildRoutePolyline(primaryMission, dashState.intersections),
+                              ].where((p) => p.points.length >= 2).toList(),
+                            ),
+                          // Vehicle markers
                           MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: const LatLng(22.7196, 75.8577),
-                                width: 36,
-                                height: 36,
-                                child: Tooltip(
-                                  message: 'A-12: 5 min',
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
-                                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-                                    ),
-                                    child: const Icon(Icons.local_hospital, color: Colors.white, size: 18),
-                                  ),
-                                ),
-                              ),
-                              Marker(
-                                point: const LatLng(22.7299, 75.8656),
-                                width: 36,
-                                height: 36,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-                                  ),
-                                  child: const Icon(Icons.warning, color: Colors.white, size: 18),
-                                ),
-                              ),
-                            ],
+                            markers: state.activeMissions
+                                .where((m) => m.vehicle.currentLat != 0)
+                                .map((m) => _buildVehicleMarker(m))
+                                .toList(),
+                          ),
+                          // Intersection markers (emergency mode highlighted)
+                          MarkerLayer(
+                            markers: dashState.intersections
+                                .where((i) => i.signalMode == imodel.SignalMode.emergency)
+                                .map((i) => _buildIntersectionMarker(i))
+                                .toList(),
                           ),
                         ],
                       ),
-                      Positioned(
-                        right: 12,
-                        top: 12,
-                        child: Column(
-                          children: [
-                            _MapActionBtn(icon: Icons.add, onTap: () {}),
-                            const SizedBox(height: 8),
-                            _MapActionBtn(icon: Icons.remove, onTap: () {}),
-                            const SizedBox(height: 12),
-                            _MapActionBtn(icon: Icons.my_location, onTap: () {}),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 12,
-                        left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 14),
-                              const SizedBox(width: 4),
-                              Text('Incident Detected', style: AppTypography.micro.copyWith(fontWeight: FontWeight.bold)),
-                            ],
+                      if (state.activeMissions.isNotEmpty)
+                        Positioned(
+                          bottom: 12,
+                          left: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 8, height: 8,
+                                  decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${state.activeMissions.length} Active Emergency',
+                                  style: AppTypography.micro.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -181,75 +161,97 @@ class EmergencyMonitorScreen extends ConsumerWidget {
 
             const SizedBox(height: 16),
 
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: PulseCard(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'VEHICLE INTEL',
-                          style: AppTypography.micro.copyWith(
-                            color: AppColors.textSecondary,
-                            letterSpacing: 1.0,
+            // Real vehicle intel & junction clearance
+            if (primaryMission != null)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: PulseCard(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'VEHICLE INTEL',
+                            style: AppTypography.micro.copyWith(
+                              color: AppColors.textSecondary,
+                              letterSpacing: 1.0,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        _IntelRow(label: 'Operator', value: 'S. Jameson'),
-                        const SizedBox(height: 10),
-                        _IntelRow(label: 'Distance Remaining', value: '3.8 km'),
-                      ],
+                          const SizedBox(height: 12),
+                          _IntelRow(label: 'Vehicle', value: primaryMission.vehicle.id),
+                          const SizedBox(height: 10),
+                          _IntelRow(label: 'Driver', value: primaryMission.vehicle.operator.isNotEmpty ? primaryMission.vehicle.operator : 'Unknown'),
+                          const SizedBox(height: 10),
+                          _IntelRow(label: 'ETA', value: '${primaryMission.vehicle.etaSeconds ~/ 60} min'),
+                          const SizedBox(height: 10),
+                          _IntelRow(label: 'Distance', value: '${primaryMission.vehicle.distanceKm.toStringAsFixed(1)} km'),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: PulseCard(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'JUNCTION CLEARANCE',
-                          style: AppTypography.micro.copyWith(
-                            color: AppColors.textSecondary,
-                            letterSpacing: 1.0,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: PulseCard(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'JUNCTION CLEARANCE',
+                            style: AppTypography.micro.copyWith(
+                              color: AppColors.textSecondary,
+                              letterSpacing: 1.0,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        JunctionClearanceColumn(
-                          clearance: {
-                            'MG Road': ClearanceStatus.green,
-                            'C. Square': ClearanceStatus.green,
-                            'Market': ClearanceStatus.pending,
-                          },
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                          JunctionClearanceColumn(
+                            clearance: _buildClearanceMap(primaryMission, dashState.intersections),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
             const SizedBox(height: 20),
 
-            const SectionLabel(label: 'EVENT TIMELINE'),
-            const SizedBox(height: 8),
-            EventTimeline(
-              events: [
-                MissionEvent(timestamp: DateTime.now(), type: EventType.info, message: 'Mission Started'),
-                MissionEvent(timestamp: DateTime.now(), type: EventType.info, message: 'Signal Priority Activated'),
-                MissionEvent(timestamp: DateTime.now(), type: EventType.cleared, message: 'MG Road Junction Cleared'),
-                MissionEvent(
-                  timestamp: DateTime.now(),
-                  type: EventType.warning,
-                  message: 'Downtown Congestion Alert',
+            // Alerts section
+            if (state.filteredAlerts.isNotEmpty) ...[
+              const SectionLabel(label: 'ACTIVE ALERTS'),
+              const SizedBox(height: 8),
+              ...state.filteredAlerts.take(5).map((alert) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: PulseCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        alert.severity.name == 'high' ? Icons.error : Icons.warning_amber,
+                        color: alert.severity.name == 'high' ? AppColors.danger : AppColors.amber,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(alert.title, style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w600)),
+                            Text(alert.location, style: AppTypography.micro.copyWith(color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => ref.read(emergencyControllerProvider.notifier).clearAlert(alert.id),
+                        child: const Text('CLEAR', style: TextStyle(fontSize: 11)),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              )),
+            ],
 
             const SizedBox(height: 20),
 
@@ -277,7 +279,12 @@ class EmergencyMonitorScreen extends ConsumerWidget {
                   child: SizedBox(
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: () => context.go('/live-map/intersection/INT-001'),
+                      onPressed: () {
+                        final iid = dashState.intersections.isNotEmpty
+                            ? dashState.intersections.first.id
+                            : 'INT-001';
+                        context.go('/live-map/intersection/$iid');
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -302,6 +309,123 @@ class EmergencyMonitorScreen extends ConsumerWidget {
       bottomNavigationBar: const PulseBottomNav(currentIndex: 3),
     ),);
   }
+
+  LatLng _getMapCenter(List<ActiveMission> missions) {
+    if (missions.isNotEmpty) {
+      final v = missions.first.vehicle;
+      if (v.currentLat != 0 && v.currentLng != 0) {
+        return LatLng(v.currentLat, v.currentLng);
+      }
+    }
+    return const LatLng(22.7196, 75.8577);
+  }
+
+  Polyline _buildRoutePolyline(ActiveMission mission, List<imodel.Intersection> intersections) {
+    final points = <LatLng>[];
+
+    // Prefer road coordinates from OSRM
+    if (mission.roadCoordinates.length >= 2) {
+      for (final coord in mission.roadCoordinates) {
+        if (coord.length >= 2) {
+          points.add(LatLng(coord[0], coord[1]));
+        }
+      }
+    } else {
+      // Fallback: intersection waypoints
+      final intersectionMap = <String, LatLng>{};
+      for (final i in intersections) {
+        intersectionMap[i.id] = LatLng(i.lat, i.lng);
+      }
+      if (mission.vehicle.currentLat != 0) {
+        points.add(LatLng(mission.vehicle.currentLat, mission.vehicle.currentLng));
+      }
+      for (final iid in mission.routeIntersections) {
+        final coord = intersectionMap[iid];
+        if (coord != null) points.add(coord);
+      }
+    }
+
+    return Polyline(
+      points: points,
+      color: AppColors.primary,
+      strokeWidth: 5,
+    );
+  }
+
+  Marker _buildVehicleMarker(ActiveMission mission) {
+    final v = mission.vehicle;
+    Color color;
+    IconData icon;
+    switch (v.type) {
+      case VehicleType.ambulance:
+        color = Colors.green;
+        icon = Icons.local_hospital;
+        break;
+      case VehicleType.fire:
+        color = Colors.orange;
+        icon = Icons.local_fire_department;
+        break;
+      case VehicleType.police:
+        color = Colors.blue;
+        icon = Icons.local_police;
+        break;
+    }
+    return Marker(
+      point: LatLng(v.currentLat, v.currentLng),
+      width: 36,
+      height: 36,
+      child: Tooltip(
+        message: '${v.id}: ${v.etaSeconds ~/ 60} min',
+        child: Container(
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+      ),
+    );
+  }
+
+  Marker _buildIntersectionMarker(imodel.Intersection intersection) {
+    return Marker(
+      point: LatLng(intersection.lat, intersection.lng),
+      width: 24,
+      height: 24,
+      child: Container(
+        decoration: BoxDecoration(
+          color: intersection.signalMode == imodel.SignalMode.emergency ? Colors.green : Colors.orange,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1.5),
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+        ),
+        child: const Icon(Icons.traffic, color: Colors.white, size: 12),
+      ),
+    );
+  }
+
+  Map<String, ClearanceStatus> _buildClearanceMap(
+    ActiveMission mission,
+    List<imodel.Intersection> intersections,
+  ) {
+    final intersectionMap = <String, imodel.Intersection>{};
+    for (final i in intersections) {
+      intersectionMap[i.id] = i;
+    }
+
+    final clearance = <String, ClearanceStatus>{};
+    for (final iid in mission.routeIntersections.take(5)) {
+      final inter = intersectionMap[iid];
+      if (inter != null) {
+        clearance[inter.name] = inter.signalMode == imodel.SignalMode.emergency
+            ? ClearanceStatus.green
+            : ClearanceStatus.pending;
+      }
+    }
+    return clearance;
+  }
 }
 
 class _CompactMissionCard extends StatelessWidget {
@@ -311,7 +435,7 @@ class _CompactMissionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 160,
       child: PulseCard(
         padding: const EdgeInsets.all(12),
@@ -322,15 +446,20 @@ class _CompactMissionCard extends StatelessWidget {
               children: [
                 Icon(_getIcon(), size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 6),
-                Text(
-                  '${_getPrefix()}-${mission.vehicle.id}',
-                  style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+                Flexible(
+                  child: Text(
+                    mission.vehicle.id,
+                    style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              '${mission.vehicle.originName} → ${mission.vehicle.destinationName}',
+              mission.vehicle.destinationName.isNotEmpty
+                  ? mission.vehicle.destinationName
+                  : 'In Progress',
               style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -351,17 +480,6 @@ class _CompactMissionCard extends StatelessWidget {
         return Icons.fire_truck;
       case VehicleType.police:
         return Icons.shield;
-    }
-  }
-
-  String _getPrefix() {
-    switch (mission.vehicle.type) {
-      case VehicleType.ambulance:
-        return 'A';
-      case VehicleType.fire:
-        return 'F';
-      case VehicleType.police:
-        return 'P';
     }
   }
 }
@@ -390,32 +508,6 @@ class _IntelRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MapActionBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _MapActionBtn({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(6),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4),
-          ],
-        ),
-        child: Icon(icon, color: AppColors.textPrimary, size: 18),
-      ),
     );
   }
 }

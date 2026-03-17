@@ -8,7 +8,7 @@ from collections import Counter
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 CACHE_FILE = Path(__file__).parent / "osm_graph_cache.json"
-BBOX = "22.68,75.83,22.84,75.96"  # Indore + AITR campus area
+BBOX = "22.62,75.78,22.85,75.98"  # Full Indore city coverage
 ROAD_SPEEDS = {"trunk": 14, "primary": 12, "secondary": 10, "tertiary": 8,
                "primary_link": 11, "secondary_link": 9, "tertiary_link": 7}
 

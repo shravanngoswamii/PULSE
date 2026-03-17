@@ -74,6 +74,12 @@ def get_missions(
     missions = q.order_by(Mission.started_at.desc()).limit(50).all()
     results = []
     for m in missions:
+        road_coords = None
+        if m.road_coordinates_json:
+            try:
+                road_coords = json.loads(m.road_coordinates_json)
+            except Exception:
+                pass
         results.append(MissionOut(
             id=m.id,
             vehicle_id=m.vehicle_id,
@@ -97,6 +103,7 @@ def get_missions(
             driver_name=m.driver.name if m.driver else None,
             current_lat=m.vehicle.current_lat if m.vehicle else None,
             current_lng=m.vehicle.current_lng if m.vehicle else None,
+            road_coordinates=road_coords,
         ))
     return results
 

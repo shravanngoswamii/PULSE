@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/intersection.dart';
 import '../../data/repositories/intersection_repository.dart';
+import '../../data/repositories/mission_repository.dart';
+import '../../data/repositories/alert_repository.dart';
 
 class CityStats {
   final int vehiclesActive;
@@ -96,31 +98,36 @@ class IntelligenceState {
 
 class IntelligenceController extends StateNotifier<IntelligenceState> {
   final IntersectionRepository _intersectionRepository;
+  final MissionRepository _missionRepository;
+  final AlertRepository _alertRepository;
 
-  IntelligenceController(this._intersectionRepository)
-      : super(IntelligenceState(
+  IntelligenceController(
+    this._intersectionRepository,
+    this._missionRepository,
+    this._alertRepository,
+  ) : super(IntelligenceState(
           cityStats: const CityStats(
-            vehiclesActive: 3482,
-            avgSpeedKmh: 34.0,
-            congestionZones: 7,
-            trafficAlertsToday: 12,
+            vehiclesActive: 0,
+            avgSpeedKmh: 0,
+            congestionZones: 0,
+            trafficAlertsToday: 0,
           ),
           intersections: [],
           selectedDistrict: const DistrictData(
             sectorName: "Vijay Nagar",
             centerLat: 22.7196,
             centerLng: 75.8577,
-            congestionPercent: 0.72,
+            congestionPercent: 0,
           ),
           safetyAudit: const WeeklySafetyAudit(
-            highRiskArea: "Downtown",
-            accidentsThisWeek: 6,
-            mostCommonCause: "Signal Violations",
+            highRiskArea: "N/A",
+            accidentsThisWeek: 0,
+            mostCommonCause: "N/A",
           ),
           incidentInsights: const IncidentInsights(
-            highRiskArea: "Downtown",
-            accidentsThisWeek: 6,
-            mostCommonCause: "Signal Violations",
+            highRiskArea: "N/A",
+            accidentsThisWeek: 0,
+            mostCommonCause: "N/A",
           ),
         ));
 
@@ -128,39 +135,93 @@ class IntelligenceController extends StateNotifier<IntelligenceState> {
     state = state.copyWith(isLoading: true);
     try {
       final intersections = await _intersectionRepository.getIntersections();
-      state = state.copyWith(intersections: intersections, isLoading: false);
+      final missions = await _missionRepository.getActiveMissions();
+      final alerts = await _alertRepository.getAlerts();
+
+      // Compute real stats from data
+      final totalVehiclesWaiting = intersections.fold<int>(0, (sum, i) => sum + i.vehiclesWaiting);
+      final congestionZones = intersections.where((i) => i.congestionLevel == CongestionLevel.high).length;
+      final avgDelay = intersections.isNotEmpty
+          ? intersections.fold<int>(0, (sum, i) => sum + i.avgDelaySeconds) / intersections.length
+          : 0.0;
+      // Estimate avg speed: lower delay = higher speed (rough heuristic)
+      final avgSpeed = avgDelay > 0 ? (50.0 - avgDelay * 0.5).clamp(10.0, 60.0) : 35.0;
+
+      // Find highest congestion district
+      final districtCongestion = <String, List<Intersection>>{};
+      for (final i in intersections) {
+        districtCongestion.putIfAbsent(i.district, () => []).add(i);
+      }
+      String peakDistrict = "Vijay Nagar";
+      double peakCongestion = 0;
+      double peakLat = 22.7196, peakLng = 75.8577;
+      for (final entry in districtCongestion.entries) {
+        final highCount = entry.value.where((i) => i.congestionLevel == CongestionLevel.high).length;
+        final double pct = entry.value.isNotEmpty ? highCount / entry.value.length : 0.0;
+        if (pct > peakCongestion) {
+          peakCongestion = pct;
+          peakDistrict = entry.key;
+          peakLat = entry.value.first.lat;
+          peakLng = entry.value.first.lng;
+        }
+      }
+
+      state = state.copyWith(
+        intersections: intersections,
+        cityStats: CityStats(
+          vehiclesActive: totalVehiclesWaiting + missions.length,
+          avgSpeedKmh: avgSpeed,
+          congestionZones: congestionZones,
+          trafficAlertsToday: alerts.length,
+        ),
+        selectedDistrict: DistrictData(
+          sectorName: peakDistrict,
+          centerLat: peakLat,
+          centerLng: peakLng,
+          congestionPercent: peakCongestion,
+        ),
+        safetyAudit: WeeklySafetyAudit(
+          highRiskArea: peakDistrict,
+          accidentsThisWeek: alerts.length,
+          mostCommonCause: alerts.isNotEmpty ? alerts.first.type.name : "N/A",
+        ),
+        incidentInsights: IncidentInsights(
+          highRiskArea: peakDistrict,
+          accidentsThisWeek: alerts.length,
+          mostCommonCause: alerts.isNotEmpty ? alerts.first.type.name : "N/A",
+        ),
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }
 
   void selectDistrict(String sectorName) {
-    if (sectorName == "Vijay Nagar") {
+    final intersections = state.intersections;
+    final districtIntersections = intersections.where((i) => i.district == sectorName).toList();
+    if (districtIntersections.isNotEmpty) {
+      final highCount = districtIntersections.where((i) => i.congestionLevel == CongestionLevel.high).length;
       state = state.copyWith(
-        selectedDistrict: const DistrictData(
-          sectorName: "Vijay Nagar",
-          centerLat: 22.7196,
-          centerLng: 75.8577,
-          congestionPercent: 0.72,
+        selectedDistrict: DistrictData(
+          sectorName: sectorName,
+          centerLat: districtIntersections.first.lat,
+          centerLng: districtIntersections.first.lng,
+          congestionPercent: highCount / districtIntersections.length,
         ),
       );
     }
   }
 
-  void refreshStats() {
-    state = state.copyWith(
-      cityStats: CityStats(
-        vehiclesActive: 3400 + (state.cityStats.vehiclesActive % 100) + 1,
-        avgSpeedKmh: 34.0,
-        congestionZones: 7,
-        trafficAlertsToday: 12,
-      ),
-    );
+  Future<void> refreshStats() async {
+    await initialize();
   }
 }
 
 final intelligenceControllerProvider =
     StateNotifierProvider<IntelligenceController, IntelligenceState>((ref) {
-  final repository = ref.watch(intersectionRepositoryProvider);
-  return IntelligenceController(repository);
+  final intersectionRepo = ref.watch(intersectionRepositoryProvider);
+  final missionRepo = ref.watch(missionRepositoryProvider);
+  final alertRepo = ref.watch(alertRepositoryProvider);
+  return IntelligenceController(intersectionRepo, missionRepo, alertRepo);
 });

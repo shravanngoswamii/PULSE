@@ -64,19 +64,23 @@ class Intersection extends Equatable {
   }
 
   factory Intersection.fromJson(Map<String, dynamic> json) {
+    final modeStr = (json['signalMode'] ?? json['signal_mode'] ?? 'automatic') as String;
+    final phaseStr = (json['currentPhase'] ?? json['current_phase'] ?? 'green') as String;
+    final congestionStr = (json['congestionLevel'] ?? json['congestion_level'] ?? 'low') as String;
+
     return Intersection(
       id: json['id'] as String,
       name: json['name'] as String,
-      district: json['district'] as String,
+      district: json['district'] as String? ?? '',
       lat: (json['lat'] as num).toDouble(),
       lng: (json['lng'] as num).toDouble(),
-      signalMode: SignalMode.values.firstWhere((e) => e.name == json['signalMode']),
-      currentPhase: SignalPhase.values.firstWhere((e) => e.name == json['currentPhase']),
-      vehiclesWaiting: json['vehiclesWaiting'] as int,
-      avgDelaySeconds: json['avgDelaySeconds'] as int,
-      congestionLevel: CongestionLevel.values.firstWhere((e) => e.name == json['congestionLevel']),
+      signalMode: SignalMode.values.firstWhere((e) => e.name == modeStr, orElse: () => SignalMode.automatic),
+      currentPhase: SignalPhase.values.firstWhere((e) => e.name == phaseStr, orElse: () => SignalPhase.green),
+      vehiclesWaiting: (json['vehiclesWaiting'] ?? json['vehicles_waiting'] ?? 0) as int,
+      avgDelaySeconds: (json['avgDelaySeconds'] ?? json['avg_delay_seconds'] ?? 0) as int,
+      congestionLevel: CongestionLevel.values.firstWhere((e) => e.name == congestionStr, orElse: () => CongestionLevel.low),
       lastOverride: json['lastOverride'] != null ? DateTime.parse(json['lastOverride'] as String) : null,
-      assignedVehicleId: json['assignedVehicleId'] as String?,
+      assignedVehicleId: (json['assignedVehicleId'] ?? json['assigned_vehicle_id'] ?? json['assigned_operator_id']) as String?,
     );
   }
 

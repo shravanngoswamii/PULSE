@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/active_mission.dart';
 import '../models/emergency_vehicle.dart';
@@ -57,20 +58,31 @@ class ApiMissionRepository implements MissionRepository {
   }
 
   ActiveMission _parseMission(Map<String, dynamic> json) {
-    // Parse vehicle - may be nested or flat
-    final vehicleJson = json['vehicle'] as Map<String, dynamic>? ?? json;
+    // Parse vehicle - may be nested or flat (backend MissionOut has flat fields)
+    final vehicleJson = json['vehicle'] as Map<String, dynamic>?;
+    final vid = vehicleJson?['id']
+        ?? json['vehicle_id']
+        ?? '';
+    final vtype = vehicleJson?['type']
+        ?? json['vehicle_type']
+        ?? 'ambulance';
+    final driverName = vehicleJson?['operator']
+        ?? json['driver_name']
+        ?? '';
+    final etaMin = _toDouble(json['eta_minutes'] ?? vehicleJson?['etaSeconds'] ?? 0);
+
     final vehicle = EmergencyVehicle(
-      id: (vehicleJson['id'] ?? vehicleJson['vehicle_id'] ?? '') as String,
-      type: _parseVehicleType(vehicleJson['type'] as String? ?? 'ambulance'),
-      operator: (vehicleJson['operator'] ?? vehicleJson['driver'] ?? '') as String,
-      status: _parseVehicleStatus(vehicleJson['status'] as String? ?? 'active'),
-      currentLat: _toDouble(vehicleJson['currentLat'] ?? vehicleJson['current_lat'] ?? vehicleJson['lat'] ?? 0),
-      currentLng: _toDouble(vehicleJson['currentLng'] ?? vehicleJson['current_lng'] ?? vehicleJson['lng'] ?? 0),
-      destinationName: (vehicleJson['destinationName'] ?? vehicleJson['destination_name'] ?? vehicleJson['destination'] ?? '') as String,
-      originName: (vehicleJson['originName'] ?? vehicleJson['origin_name'] ?? vehicleJson['origin'] ?? '') as String,
-      etaSeconds: (vehicleJson['etaSeconds'] ?? vehicleJson['eta_seconds'] ?? vehicleJson['eta'] ?? 0) as int,
-      distanceKm: _toDouble(vehicleJson['distanceKm'] ?? vehicleJson['distance_km'] ?? vehicleJson['distance'] ?? 0),
-      corridorId: vehicleJson['corridorId'] as String? ?? vehicleJson['corridor_id'] as String?,
+      id: vid as String,
+      type: _parseVehicleType(vtype as String),
+      operator: driverName as String,
+      status: _parseVehicleStatus(json['status'] as String? ?? 'active'),
+      currentLat: _toDouble(json['current_lat'] ?? vehicleJson?['currentLat'] ?? json['origin_lat'] ?? 0),
+      currentLng: _toDouble(json['current_lng'] ?? vehicleJson?['currentLng'] ?? json['origin_lng'] ?? 0),
+      destinationName: (json['destination_name'] ?? vehicleJson?['destinationName'] ?? '') as String,
+      originName: (json['origin_name'] ?? vehicleJson?['originName'] ?? '') as String,
+      etaSeconds: (etaMin * 60).toInt(),
+      distanceKm: _toDouble(json['distance_km'] ?? vehicleJson?['distanceKm'] ?? 0),
+      corridorId: (json['corridorId'] ?? json['corridor_id']) as String?,
     );
 
     // Parse junction clearance
@@ -94,19 +106,51 @@ class ApiMissionRepository implements MissionRepository {
       );
     }).toList();
 
+    // Parse road coordinates for route polyline rendering
+    List<List<double>> roadCoordinates = [];
+    final roadCoordsRaw = json['road_coordinates'] ?? json['roadCoordinates'];
+    if (roadCoordsRaw is List) {
+      for (final coord in roadCoordsRaw) {
+        if (coord is Map) {
+          final lat = (coord['lat'] as num?)?.toDouble();
+          final lng = (coord['lng'] as num?)?.toDouble();
+          if (lat != null && lng != null) {
+            roadCoordinates.add([lat, lng]);
+          }
+        }
+      }
+    }
+
+    // Parse route_path which may be a JSON string of intersection IDs
+    List<String> routeIntersections = [];
+    final routeRaw = json['routeIntersections'] ?? json['route_intersections'] ?? json['route_path'];
+    if (routeRaw is List) {
+      routeIntersections = List<String>.from(routeRaw);
+    } else if (routeRaw is String && routeRaw.isNotEmpty) {
+      try {
+        final parsed = List<dynamic>.from(
+          (routeRaw.startsWith('[')) ? _jsonDecode(routeRaw) : [],
+        );
+        routeIntersections = parsed.map((e) => e.toString()).toList();
+      } catch (_) {}
+    }
+
     return ActiveMission(
       id: (json['id'] ?? json['mission_id'] ?? '') as String,
       vehicle: vehicle,
-      routeIntersections: List<String>.from(json['routeIntersections'] ?? json['route_intersections'] ?? []),
+      routeIntersections: routeIntersections,
       junctionClearance: junctionClearance,
-      startTime: DateTime.tryParse((json['startTime'] ?? json['start_time'] ?? '').toString()) ?? DateTime.now(),
-      estimatedArrival: DateTime.tryParse((json['estimatedArrival'] ?? json['estimated_arrival'] ?? '').toString()) ?? DateTime.now().add(const Duration(minutes: 10)),
+      startTime: DateTime.tryParse((json['startTime'] ?? json['start_time'] ?? json['started_at'] ?? '').toString()) ?? DateTime.now(),
+      estimatedArrival: DateTime.tryParse((json['estimatedArrival'] ?? json['estimated_arrival'] ?? '').toString())
+          ?? DateTime.now().add(Duration(minutes: etaMin.toInt().clamp(1, 60))),
       status: _parseMissionStatus(json['status'] as String? ?? 'active'),
       eventLog: eventLog,
+      roadCoordinates: roadCoordinates,
     );
   }
 
   double _toDouble(dynamic v) => (v is num) ? v.toDouble() : 0.0;
+  static dynamic _jsonDecode(String s) => jsonDecode(s);
 
   VehicleType _parseVehicleType(String s) {
     switch (s.toLowerCase()) {

@@ -1,13 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../shared/widgets/pulse_card.dart';
+import '../dashboard_controller.dart';
 
-class TrafficAnalyticsCard extends StatelessWidget {
+class TrafficAnalyticsCard extends ConsumerWidget {
   const TrafficAnalyticsCard({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(dashboardControllerProvider);
+    final status = state.systemStatus;
+
+    // Find the most congested intersection
+    final congested = state.intersections
+        .where((i) => i.congestionLevel.name == 'high')
+        .toList();
+    final peakArea = congested.isNotEmpty
+        ? congested.first.district
+        : (state.intersections.isNotEmpty ? state.intersections.first.district : 'N/A');
+    final peakDelay = congested.isNotEmpty
+        ? '${congested.first.avgDelaySeconds}s delay'
+        : '${status.averageDelaySeconds}s avg';
+
     return PulseCard(
       child: Row(
         children: [
@@ -34,16 +50,19 @@ class TrafficAnalyticsCard extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    Text(
-                      'Harbor District',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        peakArea,
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '32 km/h',
+                      peakDelay,
                       style: AppTypography.bodyMedium.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,

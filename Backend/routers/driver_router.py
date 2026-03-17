@@ -44,7 +44,7 @@ def get_dashboard(user: User = Depends(require_role("driver")), db: Session = De
         vehicle = db.query(Vehicle).filter(Vehicle.id == user.vehicle_id).first()
 
     active = db.query(Mission).filter(Mission.driver_id == user.id, Mission.status == "active").first()
-    recent = db.query(Mission).filter(Mission.driver_id == user.id, Mission.status != "active").order_by(Mission.started_at.desc()).limit(5).all()
+    recent = db.query(Mission).filter(Mission.driver_id == user.id, Mission.status != "active").order_by(Mission.started_at.desc()).all()
     alerts = db.query(Alert).filter(Alert.is_active == True).limit(5).all()
 
     return DriverDashboard(
@@ -330,10 +330,24 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
             stored = json.loads(mission.road_coordinates_json)
             road_coords = [GPSLocation(lat=c["lat"], lng=c["lng"]) for c in stored]
 
+        # Calculate remaining distance/ETA from vehicle's current position
+        remaining_km = mission.distance_km or 0
+        remaining_eta = mission.eta_minutes or 0
+        if vehicle and vehicle.current_lat and vehicle.current_lng:
+            remaining_m = haversine(
+                vehicle.current_lat, vehicle.current_lng,
+                mission.destination_lat, mission.destination_lng,
+            )
+            remaining_km = round(remaining_m / 1000.0, 3)
+            # Estimate ETA proportional to remaining distance
+            if mission.distance_km and mission.distance_km > 0:
+                ratio = remaining_km / mission.distance_km
+                remaining_eta = round((mission.eta_minutes or 0) * ratio, 2)
+
         return RouteResponse(
             mission_id=mission.id,
-            eta_minutes=mission.eta_minutes or 0,
-            distance_km=mission.distance_km or 0,
+            eta_minutes=remaining_eta,
+            distance_km=remaining_km,
             route_coordinates=road_coords,
             route_intersections=old_path,
             next_signal_state="PRIMARY",
@@ -341,6 +355,7 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
             signals_cleared=mission.signals_cleared,
             current_lat=vehicle.current_lat if vehicle else None,
             current_lng=vehicle.current_lng if vehicle else None,
+            status=mission.status,
         )
 
     # Manual drive: update vehicle position from device GPS
@@ -404,6 +419,9 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
         next_signal_state="PRIMARY",
         signals_on_route=len(old_path),
         signals_cleared=mission.signals_cleared,
+        status=mission.status,
+        current_lat=vehicle.current_lat if vehicle else None,
+        current_lng=vehicle.current_lng if vehicle else None,
     )
 
 

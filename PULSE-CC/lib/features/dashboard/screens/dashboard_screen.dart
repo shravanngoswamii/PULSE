@@ -56,13 +56,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Approaching vehicle alert banners
+                    ...state.approachingAlerts.map((alert) => _ApproachingAlertBanner(
+                      alert: alert,
+                      onDismiss: () => ref.read(dashboardControllerProvider.notifier).dismissAlert(alert),
+                    )),
+
                     const SectionLabel(label: 'SYSTEM STATUS'),
                     SystemStatusCard(status: state.systemStatus),
                     const SizedBox(height: 20),
                     const SectionLabel(label: 'LIVE MAP INTELLIGENCE'),
                     const LiveMapPreview(),
                     const SizedBox(height: 20),
-                    const SectionLabel(label: 'ACTIVE MISSIONS'),
+                    SectionLabel(
+                      label: 'ACTIVE MISSIONS',
+                      trailing: state.activeMissions.isNotEmpty
+                          ? Text(
+                              '${state.activeMissions.length}',
+                              style: AppTypography.labelMedium.copyWith(
+                                color: AppColors.danger,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
+                    ),
+                    if (state.activeMissions.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No active missions',
+                          style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ),
                     ...state.activeMissions.map((mission) => ActiveMissionTile(mission: mission)),
                     const SizedBox(height: 20),
                     if (state.intersections.isNotEmpty) ...[
@@ -86,12 +111,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     const SizedBox(height: 12),
                     _StackedButton(
-                      label: 'SIMULATION CONTROL',
-                      icon: Icons.bar_chart,
+                      label: 'EMERGENCY MONITOR',
+                      icon: Icons.warning_amber,
                       backgroundColor: AppColors.surface,
                       textColor: AppColors.textPrimary,
                       showBorder: true,
-                      onTap: () => context.go('/simulation'),
+                      onTap: () => context.go('/emergencies'),
                     ),
                     const SizedBox(height: 12),
                     _StackedButton(
@@ -108,6 +133,75 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
       bottomNavigationBar: const PulseBottomNav(currentIndex: 0),
+    );
+  }
+}
+
+/// Banner showing when a driver is approaching an intersection near the operator.
+class _ApproachingAlertBanner extends StatelessWidget {
+  final ApproachingVehicleAlert alert;
+  final VoidCallback onDismiss;
+
+  const _ApproachingAlertBanner({required this.alert, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: Colors.red.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.warning_rounded, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'EMERGENCY VEHICLE APPROACHING',
+                  style: AppTypography.micro.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                    letterSpacing: 1.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  alert.message,
+                  style: AppTypography.bodySmall.copyWith(color: Colors.white),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${alert.vehicleId} → ${alert.intersectionName}',
+                  style: AppTypography.micro.copyWith(color: Colors.white.withOpacity(0.8)),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close, color: Colors.white, size: 20),
+          ),
+        ],
+      ),
     );
   }
 }

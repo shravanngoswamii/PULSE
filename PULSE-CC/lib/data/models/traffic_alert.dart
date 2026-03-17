@@ -33,16 +33,31 @@ class TrafficAlert extends Equatable {
   });
 
   factory TrafficAlert.fromJson(Map<String, dynamic> json) {
+    final typeStr = (json['type'] ?? 'accident') as String;
+    // Map backend type names (e.g. 'emergency_vehicle', 'signal_failure') to enum names
+    final typeMap = {
+      'accident': AlertType.accident,
+      'signal_failure': AlertType.signalFailure,
+      'signalFailure': AlertType.signalFailure,
+      'emergency_vehicle': AlertType.emergencyVehicle,
+      'emergencyVehicle': AlertType.emergencyVehicle,
+      'congestion': AlertType.congestion,
+    };
+    final sevStr = (json['severity'] ?? 'medium') as String;
+    final timestampStr = json['timestamp'] as String?
+        ?? json['created_at'] as String?
+        ?? DateTime.now().toIso8601String();
+
     return TrafficAlert(
       id: json['id'] as String,
-      type: AlertType.values.firstWhere((e) => e.name == json['type']),
-      severity: Severity.values.firstWhere((e) => e.name == json['severity']),
-      title: json['title'] as String,
-      location: json['location'] as String,
-      intersectionId: json['intersectionId'] as String?,
-      vehicleId: json['vehicleId'] as String?,
-      timestamp: DateTime.parse(json['timestamp'] as String),
-      isActive: json['isActive'] as bool,
+      type: typeMap[typeStr] ?? AlertType.accident,
+      severity: Severity.values.firstWhere((e) => e.name == sevStr, orElse: () => Severity.medium),
+      title: json['title'] as String? ?? '',
+      location: json['location'] as String? ?? '',
+      intersectionId: (json['intersectionId'] ?? json['intersection_id']) as String?,
+      vehicleId: (json['vehicleId'] ?? json['vehicle_id']) as String?,
+      timestamp: DateTime.tryParse(timestampStr) ?? DateTime.now(),
+      isActive: (json['isActive'] ?? json['is_active'] ?? true) as bool,
       description: json['description'] as String?,
       lat: (json['lat'] as num?)?.toDouble() ?? 22.7196,
       lng: (json['lng'] as num?)?.toDouble() ?? 75.8577,

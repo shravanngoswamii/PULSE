@@ -125,8 +125,14 @@ class RecentMission {
   String get timeAgo {
     if (startedAt == null) return '';
     try {
-      final start = DateTime.parse(startedAt!);
-      final diff = DateTime.now().difference(start);
+      // Backend sends UTC timestamps — ensure we parse as UTC and compare with UTC now
+      var start = DateTime.parse(startedAt!);
+      if (!start.isUtc) {
+        start = DateTime.utc(start.year, start.month, start.day, start.hour, start.minute, start.second);
+      }
+      final diff = DateTime.now().toUtc().difference(start);
+      if (diff.isNegative) return 'just now';
+      if (diff.inSeconds < 60) return 'just now';
       if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
       if (diff.inHours < 24) return '${diff.inHours}h ago';
       if (diff.inDays < 7) return '${diff.inDays}d ago';

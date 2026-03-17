@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # --- Auth ---
@@ -127,6 +127,7 @@ class RouteResponse(BaseModel):
     signals_cleared: int = 0
     current_lat: Optional[float] = None  # Vehicle's current position (for auto_drive)
     current_lng: Optional[float] = None
+    status: Optional[str] = None  # Mission status (active/completed)
 
 class GPSPing(BaseModel):
     mission_id: str
@@ -158,6 +159,17 @@ class MissionOut(BaseModel):
     driver_name: Optional[str] = None
     current_lat: Optional[float] = None
     current_lng: Optional[float] = None
+
+    # Road coordinates for corridor rendering (list of {lat, lng} dicts)
+    road_coordinates: Optional[List[Dict]] = None
+
+    @field_validator("started_at", "completed_at", mode="before")
+    @classmethod
+    def _ensure_utc(cls, v):
+        """SQLite strips timezone — tag naive datetimes as UTC so JSON has +00:00."""
+        if isinstance(v, datetime) and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
     class Config:
         from_attributes = True

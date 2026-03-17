@@ -10,6 +10,8 @@ def gen_uuid():
 
 
 def utcnow():
+    # Return timezone-aware UTC datetime so Pydantic serializes with +00:00 suffix
+    # This ensures Flutter's DateTime.parse treats it as UTC, not local time
     return datetime.now(timezone.utc)
 
 

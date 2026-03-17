@@ -51,7 +51,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: AppColors.primary,
                 borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
@@ -61,14 +60,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                 ],
               ),
-              child: const Center(
-                child: Text(
-                  'P',
-                  style: TextStyle(
-                    fontSize: 56,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: Image.asset(
+                  'assets/logo.png',
+                  width: 120,
+                  height: 120,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
