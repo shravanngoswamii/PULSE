@@ -90,6 +90,9 @@ class Mission(Base):
     eta_minutes = Column(Float, nullable=True)
     distance_km = Column(Float, nullable=True)
     signals_cleared = Column(Integer, default=0)
+    auto_drive = Column(Boolean, default=False)
+    road_coordinates_json = Column(Text, nullable=True)  # JSON: OSRM road coords for viz replay
+    algo_steps_json = Column(Text, nullable=True)  # JSON: A* algorithm steps for viz replay
     started_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
 

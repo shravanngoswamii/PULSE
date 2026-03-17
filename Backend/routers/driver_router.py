@@ -68,6 +68,108 @@ def get_nearby_hospitals(lat: float = Query(...), lng: float = Query(...), db: S
     return results[:15]
 
 
+# ── Auto-drive background task ──────────────────────────────────────────
+async def _auto_drive_mission(mission_id: str, vehicle_id: str, road_coords: list, intersection_path: list):
+    """Background task: simulate vehicle driving along the route."""
+    import asyncio
+    from database import SessionLocal
+
+    # Subsample to ~80 steps for ~2-3 min demo at 2s intervals
+    total = len(road_coords)
+    step_size = max(1, total // 80)
+    coords = road_coords[::step_size]
+    # Always include last coordinate
+    if coords[-1] != road_coords[-1]:
+        coords.append(road_coords[-1])
+
+    await asyncio.sleep(3)  # Wait a few seconds before starting
+
+    remaining_min = 0
+    for i, coord in enumerate(coords):
+        lat, lng = coord["lat"], coord["lng"]
+
+        try:
+            db = SessionLocal()
+            try:
+                mission = db.query(Mission).filter(Mission.id == mission_id).first()
+                if not mission or mission.status != "active":
+                    break  # Mission was ended manually
+
+                vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+                if vehicle:
+                    vehicle.current_lat = lat
+                    vehicle.current_lng = lng
+
+                # Update signals cleared
+                nodes_cache, _ = load_graph(db)
+                old_path = json.loads(mission.route_path) if mission.route_path else []
+                passed = 0
+                for n in old_path:
+                    if n in nodes_cache:
+                        d_to_vehicle = haversine(lat, lng, nodes_cache[n]["lat"], nodes_cache[n]["lng"])
+                        d_to_origin = haversine(mission.origin_lat, mission.origin_lng, nodes_cache[n]["lat"], nodes_cache[n]["lng"])
+                        if d_to_vehicle > d_to_origin:
+                            passed += 1
+                mission.signals_cleared = max(mission.signals_cleared, passed)
+
+                # Update ETA/distance based on progress
+                progress = (i + 1) / len(coords)
+                remaining_km = mission.distance_km * (1 - progress) if mission.distance_km else 0
+                remaining_min = mission.eta_minutes * (1 - progress) if mission.eta_minutes else 0
+
+                db.commit()
+            finally:
+                db.close()
+
+            # Broadcast position
+            await manager.broadcast("visualizer", {
+                "event": "vehicle_moved",
+                "mission_id": mission_id,
+                "lat": lat, "lng": lng,
+            })
+            await manager.broadcast("operator", {
+                "event": "vehicle_position",
+                "mission_id": mission_id, "vehicle_id": vehicle_id,
+                "lat": lat, "lng": lng,
+                "eta_minutes": round(remaining_min, 1),
+            })
+        except Exception as e:
+            print(f"[auto-drive] Error at step {i}: {e}")
+
+        await asyncio.sleep(2)
+
+    # Auto-end mission
+    try:
+        db = SessionLocal()
+        try:
+            mission = db.query(Mission).filter(Mission.id == mission_id).first()
+            if mission and mission.status == "active":
+                mission.status = "completed"
+                mission.completed_at = datetime.now(timezone.utc)
+
+                vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+                if vehicle:
+                    vehicle.status = "standby"
+
+                old_path = json.loads(mission.route_path) if mission.route_path else []
+                for iid in old_path:
+                    inter = db.query(Intersection).filter(Intersection.id == iid).first()
+                    if inter and inter.signal_mode == "emergency":
+                        inter.signal_mode = "automatic"
+
+                mission.signals_cleared = len(old_path)
+                db.commit()
+
+                live_missions_viz.pop(mission_id, None)
+                await manager.broadcast("operator", {"event": "mission_completed", "mission_id": mission_id})
+                await manager.broadcast("visualizer", {"event": "mission_completed", "mission_id": mission_id})
+                print(f"[auto-drive] Mission {mission_id} completed!")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[auto-drive] Error ending mission: {e}")
+
+
 @router.post("/mission/start", response_model=RouteResponse)
 async def start_mission(req: MissionStartRequest, user: User = Depends(require_role("driver")), db: Session = Depends(get_db)):
     vehicle = db.query(Vehicle).filter(Vehicle.id == req.vehicle_id).first()
@@ -97,7 +199,9 @@ async def start_mission(req: MissionStartRequest, user: User = Depends(require_r
         eta_minutes = calculate_eta(intersection_path, graph)
         distance_km = calculate_distance_km(intersection_path, nodes)
 
-    # Create mission
+    # Serialize viz data for replay & create mission
+    road_coords_list = [{"lat": c.lat, "lng": c.lng} for c in road_coords]
+
     mission = Mission(
         vehicle_id=req.vehicle_id, driver_id=user.id,
         incident_type=req.incident_type, priority=req.priority,
@@ -106,6 +210,9 @@ async def start_mission(req: MissionStartRequest, user: User = Depends(require_r
         destination_lat=req.destination_lat, destination_lng=req.destination_lng,
         route_path=json.dumps(intersection_path),
         eta_minutes=eta_minutes, distance_km=distance_km,
+        auto_drive=req.auto_drive,
+        road_coordinates_json=json.dumps(road_coords_list),
+        algo_steps_json=json.dumps(algo_steps),
     )
     db.add(mission)
 
@@ -130,8 +237,6 @@ async def start_mission(req: MissionStartRequest, user: User = Depends(require_r
     db.refresh(mission)
 
     # Store visualization data for the live visualizer
-    # Include OSRM road coordinates for accurate map rendering
-    road_coords_list = [{"lat": c.lat, "lng": c.lng} for c in road_coords]
     live_missions_viz[mission.id] = {
         "mission_id": mission.id,
         "vehicle_id": req.vehicle_id,
@@ -186,6 +291,16 @@ async def start_mission(req: MissionStartRequest, user: User = Depends(require_r
                 "message": f"Emergency {vehicle.type} approaching {detail['name']} - Clear corridor!",
             })
 
+    # ── Auto-drive: spawn background task to simulate vehicle movement ──
+    if req.auto_drive and road_coords_list:
+        import asyncio
+        asyncio.create_task(_auto_drive_mission(
+            mission_id=mission.id,
+            vehicle_id=req.vehicle_id,
+            road_coords=road_coords_list,
+            intersection_path=intersection_path,
+        ))
+
     return RouteResponse(
         mission_id=mission.id,
         eta_minutes=eta_minutes,
@@ -203,8 +318,32 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
     if not mission:
         raise HTTPException(status_code=404, detail="Mission not found")
 
-    # Update vehicle position
     vehicle = db.query(Vehicle).filter(Vehicle.id == mission.vehicle_id).first()
+
+    # If auto_drive is active, the backend drives the vehicle — don't overwrite
+    # its position with the device's GPS. Just return the simulated position.
+    if mission.auto_drive:
+        old_path = json.loads(mission.route_path) if mission.route_path else []
+        # Return original road coordinates from stored data
+        road_coords = []
+        if mission.road_coordinates_json:
+            stored = json.loads(mission.road_coordinates_json)
+            road_coords = [GPSLocation(lat=c["lat"], lng=c["lng"]) for c in stored]
+
+        return RouteResponse(
+            mission_id=mission.id,
+            eta_minutes=mission.eta_minutes or 0,
+            distance_km=mission.distance_km or 0,
+            route_coordinates=road_coords,
+            route_intersections=old_path,
+            next_signal_state="PRIMARY",
+            signals_on_route=len(old_path),
+            signals_cleared=mission.signals_cleared,
+            current_lat=vehicle.current_lat if vehicle else None,
+            current_lng=vehicle.current_lng if vehicle else None,
+        )
+
+    # Manual drive: update vehicle position from device GPS
     if vehicle:
         vehicle.current_lat = ping.current_lat
         vehicle.current_lng = ping.current_lng
@@ -251,7 +390,6 @@ async def ping_gps(ping: GPSPing, user: User = Depends(require_role("driver")), 
     })
 
     # If OSRM failed, return coordinates from origin to destination as fallback
-    # (use the original mission's OSRM route, not a straight line)
     if not use_new_route:
         viz = live_missions_viz.get(mission.id)
         if viz and viz.get("road_coordinates"):
@@ -312,6 +450,41 @@ def get_mission_history(user: User = Depends(require_role("driver")), db: Sessio
 
 # --- Visualizer endpoints ---
 @router.get("/viz/missions")
-def get_viz_missions():
-    """Get all live mission visualization data (no auth needed for demo)."""
-    return list(live_missions_viz.values())
+def get_viz_missions(db: Session = Depends(get_db)):
+    """Get live + recently completed mission visualization data (no auth needed for demo)."""
+    result = list(live_missions_viz.values())
+
+    # Also include recently completed missions from DB (last 20)
+    completed = (
+        db.query(Mission)
+        .filter(Mission.status == "completed")
+        .order_by(Mission.completed_at.desc())
+        .limit(20)
+        .all()
+    )
+    live_ids = {m["mission_id"] for m in result}
+    for m in completed:
+        if m.id in live_ids:
+            continue
+        road_coords = json.loads(m.road_coordinates_json) if m.road_coordinates_json else []
+        algo_steps = json.loads(m.algo_steps_json) if m.algo_steps_json else []
+        intersection_path = json.loads(m.route_path) if m.route_path else []
+        result.append({
+            "mission_id": m.id,
+            "vehicle_id": m.vehicle_id,
+            "vehicle_type": m.vehicle.type if m.vehicle else None,
+            "driver_name": m.driver.name if m.driver else None,
+            "incident_type": m.incident_type,
+            "priority": m.priority,
+            "origin": {"lat": m.origin_lat, "lng": m.origin_lng},
+            "destination": {"lat": m.destination_lat, "lng": m.destination_lng, "name": m.destination_name},
+            "intersection_path": intersection_path,
+            "route_details": [],
+            "algo_steps": algo_steps,
+            "road_coordinates": road_coords,
+            "distance_km": m.distance_km,
+            "eta_minutes": m.eta_minutes,
+            "timestamp": m.started_at.isoformat() if m.started_at else None,
+            "completed": True,
+        })
+    return result

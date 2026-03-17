@@ -114,6 +114,7 @@ class MissionStartRequest(BaseModel):
     priority: str = "high"
     origin_lat: Optional[float] = None
     origin_lng: Optional[float] = None
+    auto_drive: bool = False  # If True, backend auto-drives the vehicle along the route
 
 class RouteResponse(BaseModel):
     mission_id: str
@@ -124,6 +125,8 @@ class RouteResponse(BaseModel):
     next_signal_state: str
     signals_on_route: int
     signals_cleared: int = 0
+    current_lat: Optional[float] = None  # Vehicle's current position (for auto_drive)
+    current_lng: Optional[float] = None
 
 class GPSPing(BaseModel):
     mission_id: str

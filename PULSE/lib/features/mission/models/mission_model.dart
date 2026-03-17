@@ -14,6 +14,9 @@ class MissionModel {
   final List<List<double>> routeCoordinates;
   final bool isRouteCalculating;
   final bool showHospitalNotification;
+  final bool isAutoDrive;
+  final double? currentLat;
+  final double? currentLng;
 
   MissionModel({
     required this.missionId,
@@ -27,6 +30,9 @@ class MissionModel {
     this.routeCoordinates = const [],
     this.isRouteCalculating = false,
     this.showHospitalNotification = false,
+    this.isAutoDrive = false,
+    this.currentLat,
+    this.currentLng,
   });
 
   MissionModel copyWith({
@@ -41,6 +47,9 @@ class MissionModel {
     List<List<double>>? routeCoordinates,
     bool? isRouteCalculating,
     bool? showHospitalNotification,
+    bool? isAutoDrive,
+    double? currentLat,
+    double? currentLng,
   }) {
     return MissionModel(
       missionId: missionId ?? this.missionId,
@@ -54,6 +63,9 @@ class MissionModel {
       routeCoordinates: routeCoordinates ?? this.routeCoordinates,
       isRouteCalculating: isRouteCalculating ?? this.isRouteCalculating,
       showHospitalNotification: showHospitalNotification ?? this.showHospitalNotification,
+      isAutoDrive: isAutoDrive ?? this.isAutoDrive,
+      currentLat: currentLat ?? this.currentLat,
+      currentLng: currentLng ?? this.currentLng,
     );
   }
 }

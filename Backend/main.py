@@ -14,9 +14,26 @@ from traffic_simulator import simulator
 from database import SessionLocal
 
 
+def _migrate_columns():
+    """Add new columns to existing tables (safe for SQLite)."""
+    import sqlalchemy
+    with engine.connect() as conn:
+        inspector = sqlalchemy.inspect(engine)
+        mission_cols = {c["name"] for c in inspector.get_columns("missions")} if "missions" in inspector.get_table_names() else set()
+        for col_name, col_type in [
+            ("auto_drive", "BOOLEAN DEFAULT 0"),
+            ("road_coordinates_json", "TEXT"),
+            ("algo_steps_json", "TEXT"),
+        ]:
+            if col_name not in mission_cols:
+                conn.execute(sqlalchemy.text(f"ALTER TABLE missions ADD COLUMN {col_name} {col_type}"))
+        conn.commit()
+
+
 @asynccontextmanager
 async def lifespan(app):
     Base.metadata.create_all(bind=engine)
+    _migrate_columns()
     # Auto-start traffic simulator
     await simulator.start(SessionLocal, manager, profile="normal")
     yield

@@ -9,7 +9,11 @@
       "Bash(pkill:*)",
       "Bash(npx vite:*)",
       "Bash(curl:*)",
-      "Bash(flutter pub:*)"
+      "Bash(flutter pub:*)",
+      "Bash(grep -E \"\\\\.py$|routers|static\")",
+      "Bash(sqlite3 \"/Users/aysh/Hackathon/Prayatna 3.0/Dev_v3/PULSE/Backend/pulse.db\" \"SELECT id, status, vehicle_id, started_at, completed_at FROM missions ORDER BY started_at DESC LIMIT 10;\")",
+      "Bash(python3 -c \"import py_compile; py_compile.compile\\(''routers/driver_router.py'', doraise=True\\); py_compile.compile\\(''models.py'', doraise=True\\); py_compile.compile\\(''schemas.py'', doraise=True\\); py_compile.compile\\(''main.py'', doraise=True\\); print\\(''All OK''\\)\")",
+      "Bash(python3 -c \"import py_compile; py_compile.compile\\(''routing_service.py'', doraise=True\\); py_compile.compile\\(''routers/driver_router.py'', doraise=True\\); print\\(''OK''\\)\")"
     ]
   }
 }

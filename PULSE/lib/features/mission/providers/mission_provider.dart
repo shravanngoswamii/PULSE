@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pulse_ev/features/dashboard/providers/dashboard_provider.dart';
 import 'package:pulse_ev/core/network/api_client.dart';
 import 'package:pulse_ev/core/services/location_service.dart';
 import 'package:pulse_ev/core/storage/token_storage.dart';
 import 'package:pulse_ev/features/auth/providers/user_provider.dart';
-import 'package:pulse_ev/features/dashboard/providers/dashboard_provider.dart';
 import 'package:pulse_ev/features/mission/models/hospital_model.dart';
 import 'package:pulse_ev/features/mission/models/mission_model.dart';
 import 'package:pulse_ev/features/mission/repositories/mission_repository.dart';
@@ -39,6 +39,7 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
   final Ref _ref;
   StreamSubscription? _gpsSubscription;
   Timer? _pingTimer;
+  Completer<void>? _startCompleter;
 
   MissionNotifier(this._repository, this._ref) : super(null);
 
@@ -83,6 +84,7 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
     required HospitalModel hospital,
     required double originLat,
     required double originLng,
+    bool autoDrive = false,
   }) async {
     final user = _ref.read(currentUserProvider);
     final vehicleId = user?.vehicleId ?? '';
@@ -99,6 +101,9 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
       status: MissionStatus.active,
       isRouteCalculating: true,
       showHospitalNotification: true,
+      isAutoDrive: autoDrive,
+      currentLat: originLat,
+      currentLng: originLng,
     );
 
     // Auto-dismiss hospital notification after 8 seconds
@@ -108,7 +113,8 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
       }
     });
 
-    // Phase 2: Fire the API call in the background
+    // Phase 2: Fire the API call in the background, tracked by completer
+    _startCompleter = Completer<void>();
     try {
       final response = await _repository.startMission(
         vehicleId: vehicleId,
@@ -119,6 +125,7 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
         priority: priority,
         originLat: originLat,
         originLng: originLng,
+        autoDrive: autoDrive,
       );
 
       final missionId = (response['mission_id'] ?? response['id'] ?? '').toString();
@@ -158,14 +165,18 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
     } catch (e) {
       // Even if API fails, keep the mission active with estimated data
       state = state?.copyWith(isRouteCalculating: false);
+    } finally {
+      _startCompleter?.complete();
+      _startCompleter = null;
     }
   }
 
   void _startGpsTracking(String missionId) {
     _stopGpsTracking();
 
-    // Ping GPS every 5 seconds
-    _pingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    // Ping more frequently for auto-drive (2s) vs manual driving (5s)
+    final interval = (state?.isAutoDrive == true) ? 2 : 5;
+    _pingTimer = Timer.periodic(Duration(seconds: interval), (_) async {
       if (state == null || state!.status != MissionStatus.active) {
         _stopGpsTracking();
         return;
@@ -197,11 +208,17 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
               // Only use if we got a meaningful number of points
               if (updatedRoute.length <= 2) updatedRoute = null;
             }
+            // Update vehicle position from backend (for auto-drive)
+            final simLat = (response['current_lat'] as num?)?.toDouble();
+            final simLng = (response['current_lng'] as num?)?.toDouble();
+
             state = state!.copyWith(
               eta: updatedEta != null ? '${updatedEta.toInt()} min' : null,
               distance: updatedDistance,
               signalsCleared: updatedSignals,
               routeCoordinates: updatedRoute,
+              currentLat: simLat,
+              currentLng: simLng,
             );
           }
         }
@@ -219,20 +236,30 @@ class MissionNotifier extends StateNotifier<MissionModel?> {
   }
 
   Future<void> endMission() async {
-    if (state != null) {
-      _stopGpsTracking();
-      // Only call backend if we have a real mission ID (not 'pending')
-      if (state!.missionId != 'pending') {
-        try {
-          await _repository.endMission(state!.missionId);
-        } catch (_) {
-          // Continue even if backend fails — stop mission locally
-        }
-      }
-      state = state!.copyWith(status: MissionStatus.completed);
-      // Invalidate dashboard so it refetches with the newly completed mission
-      _ref.invalidate(dashboardProvider);
+    if (state == null) return;
+
+    // If the start API is still running, wait for it to finish
+    // so we have the real missionId
+    if (_startCompleter != null && !_startCompleter!.isCompleted) {
+      await _startCompleter!.future;
     }
+
+    final missionId = state!.missionId;
+    _stopGpsTracking();
+
+    // Only call backend if we have a real mission ID
+    if (missionId.isNotEmpty && missionId != 'pending') {
+      try {
+        await _repository.endMission(missionId);
+      } catch (_) {
+        // Continue even if backend fails
+      }
+    }
+
+    state = state!.copyWith(status: MissionStatus.completed);
+
+    // Invalidate dashboard so it re-fetches with the new completed mission
+    _ref.invalidate(dashboardProvider);
   }
 
   @override

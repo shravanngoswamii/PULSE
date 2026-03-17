@@ -24,6 +24,7 @@ class MissionApiService {
     required String priority,
     required double originLat,
     required double originLng,
+    bool autoDrive = false,
   }) async {
     final response = await _apiClient.post(
       '/driver/mission/start',
@@ -36,6 +37,7 @@ class MissionApiService {
         'priority': priority,
         'origin_lat': originLat,
         'origin_lng': originLng,
+        'auto_drive': autoDrive,
       },
     );
     return response.data as Map<String, dynamic>;

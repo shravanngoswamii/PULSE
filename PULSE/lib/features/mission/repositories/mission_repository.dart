@@ -19,6 +19,7 @@ class MissionRepository {
     required String priority,
     required double originLat,
     required double originLng,
+    bool autoDrive = false,
   }) async {
     return await _apiService.startMission(
       vehicleId: vehicleId,
@@ -29,6 +30,7 @@ class MissionRepository {
       priority: priority,
       originLat: originLat,
       originLng: originLng,
+      autoDrive: autoDrive,
     );
   }
 

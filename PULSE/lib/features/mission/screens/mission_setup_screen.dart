@@ -36,6 +36,7 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
   String _selectedIncident = 'Medical Emergency';
   String _selectedPriority = 'Critical';
   HospitalModel? _selectedHospital;
+  bool _autoDrive = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -338,6 +339,46 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
                         ),
                       const SizedBox(height: 20),
 
+                      // Auto-Drive toggle (for demo/testing)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _autoDrive ? AppColors.primary.withValues(alpha: 0.1) : AppColors.card,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _autoDrive ? AppColors.primary : AppColors.card,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.smart_toy_outlined,
+                              color: _autoDrive ? AppColors.primary : AppColors.textSecondary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Auto Drive (Demo)', style: AppTextStyles.label.copyWith(
+                                    color: _autoDrive ? AppColors.primary : AppColors.textPrimary,
+                                  )),
+                                  Text('Vehicle drives automatically', style: AppTextStyles.micro.copyWith(fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _autoDrive,
+                              onChanged: (v) => setState(() => _autoDrive = v),
+                              activeThumbColor: AppColors.primary,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
                       AppButton(
                         text: 'START MISSION',
                         variant: ButtonVariant.emergency,
@@ -355,6 +396,7 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
                               hospital: _selectedHospital!,
                               originLat: originLat,
                               originLng: originLng,
+                              autoDrive: _autoDrive,
                             );
                             context.go('/mission/active');
                           }

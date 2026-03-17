@@ -109,6 +109,13 @@ class LiveMapScreen extends ConsumerWidget {
       }
     }
 
+    // For auto-drive: use backend-simulated position instead of device GPS
+    if (currentMission.isAutoDrive == true &&
+        currentMission.currentLat != null &&
+        currentMission.currentLng != null) {
+      currentLatLng = LatLng(currentMission.currentLat!, currentMission.currentLng!);
+    }
+
     // Destination marker
     final destinationLatLng = LatLng(
       currentMission.destinationHospital.lat,
