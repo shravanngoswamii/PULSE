@@ -1,133 +1,84 @@
-# PULSE - Smart City Emergency Traffic Management System
+# PULSE — Smart City Emergency Traffic Management
 
-PULSE is an intelligent traffic management system that creates green corridors for emergency vehicles using real-time routing algorithms, signal control, and live GPS tracking.
+Real-time green corridor system for emergency vehicles using shortest-path algorithms, signal control, and live GPS tracking.
+
+## Apps
+
+| App | Type | Tech | Port | Purpose |
+|-----|------|------|------|---------|
+| **Backend** | FastAPI server | Python, SQLAlchemy, SQLite | 9000 | REST API + WebSocket |
+| **PULSE** | Mobile (Flutter) | Riverpod, flutter_map, Dio | — | Driver / Ambulance app |
+| **PULSE-CC** | Mobile (Flutter) | Riverpod, flutter_map, Dio | — | Command Center / Operator app |
+| **Admin-Website** | Web (Vue 3) | Vite, Pinia, Axios | 5173 | Admin dashboard |
+| **PULSE-AID-WEB** | Web (Vue 3) | Vite | 5174 | Public emergency caller portal |
+
+## Network Setup (LAN / Physical Devices)
+
+All apps connect to the Backend. A single file controls the IP:
+
+**1. Set your PC's LAN IP in `network.env`:**
+
+```env
+API_HOST=192.168.1.42   # ← your PC's Wi-Fi IPv4 (ipconfig)
+API_PORT=9000
+```
+
+**2. Sync to Flutter apps:**
+
+```powershell
+# Windows
+.\sync_env.ps1
+
+# Mac/Linux
+bash sync_env.sh
+```
+
+This writes `PULSE/.env` and `PULSE-CC/.env` with the same IP.
+
+**3. Build APKs and install on phones:**
+
+```bash
+cd PULSE && flutter build apk --release
+cd PULSE-CC && flutter build apk --release
+```
+
+APKs are at `build/app/outputs/flutter-apk/app-release.apk`.
+
+**4. Web apps** are already bound to `0.0.0.0`, so phones on the same Wi-Fi can open them at `http://<YOUR_IP>:5173` (Admin) and `http://<YOUR_IP>:5174` (PULSE-AID).
 
 ## Quick Start
 
-### 1. Backend (FastAPI)
-
 ```bash
+# 1. Backend
 cd Backend
 pip install -r requirements.txt
-python seed.py          # Creates database with Indore intersections, vehicles, hospitals
-python main.py          # Starts server at http://localhost:9000
+python seed.py
+python main.py
+
+# 2. Admin Website
+cd Admin-Website
+npm install && npm run dev
+
+# 3. PULSE-AID-WEB
+cd PULSE-AID-WEB
+npm install && npm run dev
+
+# 4. Flutter apps (for dev, or build APKs as above)
+cd PULSE && flutter pub get && flutter run
+cd PULSE-CC && flutter pub get && flutter run
 ```
-
-API docs available at: http://localhost:9000/docs
-
-### 2. Admin Dashboard (Vue.js)
-
-```bash
-cd Website
-npm install
-npm run dev             # Starts at http://localhost:5173
-```
-
-Login: `admin@pulse.com` / `password123`
-
-### 3. PULSE Driver App (Flutter)
-
-```bash
-cd PULSE
-flutter pub get
-flutter run             # Run on Android emulator or device
-```
-
-Login: `driver@pulse.com` / `password123`
-
-### 4. PULSE-CC Command Center (Flutter)
-
-```bash
-cd PULSE-CC
-flutter pub get
-flutter run             # Run on Android emulator or device
-```
-
-Login: `operator@pulse.com` / `password123`
 
 ## Demo Credentials
 
-| Role       | Email                  | Password    | App           | Assigned Intersections           |
-|------------|------------------------|-------------|---------------|----------------------------------|
-| Driver     | driver@pulse.com       | password123 | PULSE         | -                                |
-| Driver 2   | driver2@pulse.com      | password123 | PULSE         | -                                |
-| Driver 3   | driver3@pulse.com      | password123 | PULSE         | -                                |
-| Operator 1 | operator@pulse.com     | password123 | PULSE-CC      | Vijay Nagar, Palasia             |
-| Operator 2 | operator2@pulse.com    | password123 | PULSE-CC      | Geeta Bhawan, Rajwada            |
-| Operator 3 | operator3@pulse.com    | password123 | PULSE-CC      | Sarwate, MG Road                 |
-| Operator 4 | operator4@pulse.com    | password123 | PULSE-CC      | Bhanwar Kuwa, Scheme 54          |
-| Operator 5 | operator5@pulse.com    | password123 | PULSE-CC      | AB Road, Bombay Hospital         |
-| Operator 6 | operator6@pulse.com    | password123 | PULSE-CC      | Rau, Mhow Naka                   |
-| Admin      | admin@pulse.com        | password123 | Web Dashboard | -                                |
+| Role | Email | Password | App |
+|------|-------|----------|-----|
+| Driver | driver@pulse.com | password123 | PULSE |
+| Operator | operator@pulse.com | password123 | PULSE-CC |
+| Admin | admin@pulse.com | password123 | Admin-Website |
 
-## System Components
+Additional drivers: `driver2@pulse.com`, `driver3@pulse.com`
+Additional operators: `operator2@pulse.com` through `operator6@pulse.com`
 
-### Backend (Python FastAPI)
-- JWT authentication with role-based access control
-- SQLite database with SQLAlchemy ORM
-- Shortest path algorithms (Dijkstra, A*, SSSP Breakthrough)
-- Dynamic graph engine with real-time weight updates
-- WebSocket for live updates to operator dashboard
-- Nearby hospital search from seeded Indore hospital data
-- Signal management (automatic/manual/emergency modes)
+## API Docs
 
-### PULSE - Driver App
-- Real-time GPS tracking using device location
-- Nearby hospital search sorted by distance
-- Mission workflow: select hospital, get optimal route, navigate
-- Live map with route polyline and current position
-- Backend integration for route calculation and GPS pings
-
-### PULSE-CC - Command Center
-- Real-time mission monitoring on live map
-- Intersection signal control (force green/red, restore automatic)
-- Emergency event timeline
-- Traffic intelligence analytics
-- WebSocket for live vehicle position updates
-
-### Admin Dashboard
-- Full CRUD for users, vehicles, intersections, hospitals, alerts
-- Mission monitoring with status filters
-- System statistics overview
-- Role management (driver, operator, admin)
-
-## Tech Stack
-
-| Component    | Technology                                    |
-|-------------|-----------------------------------------------|
-| Backend     | Python, FastAPI, SQLAlchemy, SQLite, JWT       |
-| Driver App  | Flutter, Riverpod, GoRouter, flutter_map, Dio  |
-| CC App      | Flutter, Riverpod, GoRouter, flutter_map, Dio  |
-| Admin Web   | Vue 3, Vite, Pinia, Vue Router, Axios          |
-| Maps        | OpenStreetMap (free, no API key required)       |
-| Algorithms  | Dijkstra, A*, Bellman-Ford, Floydd Warshall SSSP Breakthrough  |
-
-## Seed Data (Indore)
-
-The backend seeds with realistic Indore city data:
-- 10 major intersections (Vijay Nagar, Palasia, Rajwada, Geeta Bhawan, Bombay Hospital, etc.)
-- 24 bidirectional road edges with travel times
-- 7 emergency vehicles (3 ambulances, 2 fire engines, 2 police)
-- 12 real Indore hospitals with coordinates
-- 6 demo users across all roles
-
-## API Endpoints
-
-| Method | Endpoint                              | Role     | Description                    |
-|--------|---------------------------------------|----------|--------------------------------|
-| POST   | /api/auth/login                       | Any      | Login, returns JWT token       |
-| POST   | /api/auth/register                    | Any      | Register new user              |
-| GET    | /api/driver/dashboard                 | Driver   | Dashboard data                 |
-| GET    | /api/driver/nearby-hospitals          | Driver   | Hospitals sorted by distance   |
-| POST   | /api/driver/mission/start             | Driver   | Start emergency mission        |
-| POST   | /api/driver/mission/ping              | Driver   | Update GPS, get new route      |
-| POST   | /api/driver/mission/end               | Driver   | Complete mission               |
-| GET    | /api/operator/state                   | Operator | System overview                |
-| GET    | /api/operator/intersections           | Operator | All intersections              |
-| POST   | /api/operator/intersections/{id}/force-signal | Operator | Override signal     |
-| GET    | /api/admin/stats                      | Admin    | System statistics              |
-| CRUD   | /api/admin/users                      | Admin    | User management                |
-| CRUD   | /api/admin/vehicles                   | Admin    | Vehicle management             |
-| CRUD   | /api/admin/intersections              | Admin    | Intersection management        |
-
-Full API documentation: http://localhost:9000/docs
+`http://localhost:9000/docs`

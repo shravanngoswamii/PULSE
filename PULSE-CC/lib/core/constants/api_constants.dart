@@ -1,23 +1,31 @@
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConstants {
   ApiConstants._();
 
-  static String get _host {
-    if (kIsWeb) return 'localhost';
-    // Android emulator uses 10.0.2.2 to reach host machine;
-    // iOS simulator uses localhost directly.
-    try {
-      return Platform.isAndroid ? '10.0.2.2' : 'localhost';
-    } catch (_) {
-      return 'localhost';
-    }
+  static Future<void> load() async {
+    await dotenv.load(fileName: '.env');
   }
 
-  static String get baseUrl => 'http://$_host:9000/api';
+  static String get _host {
+    final fromEnv = dotenv.maybeGet('API_HOST');
+    if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
+    if (kIsWeb) return 'localhost';
+    return 'localhost';
+  }
 
-  static String get wsUrl => 'ws://$_host:9000/ws/operator';
+  static int get _port {
+    final fromEnv = dotenv.maybeGet('API_PORT');
+    if (fromEnv != null && fromEnv.isNotEmpty) {
+      return int.tryParse(fromEnv) ?? 9000;
+    }
+    return 9000;
+  }
+
+  static String get baseUrl => 'http://$_host:$_port/api';
+
+  static String get wsUrl => 'ws://$_host:$_port/ws/operator';
 
   static const Duration requestTimeout = Duration(seconds: 30);
   static const Duration wsReconnectDelay = Duration(seconds: 5);
