@@ -82,3 +82,18 @@ Additional operators: `operator2@pulse.com` through `operator6@pulse.com`
 ## API Docs
 
 `http://localhost:9000/docs`
+
+## Mac Support
+
+Find your Mac's LAN IP:
+
+```sh
+ipconfig getifaddr en0
+```
+
+```sh
+cd Backend
+pip install -r requirements.txt
+python seed.py
+python main.py   # Listens on 0.0.0.0:9000
+```
