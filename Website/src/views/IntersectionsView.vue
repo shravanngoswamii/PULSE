@@ -87,7 +87,7 @@ import api from '../api/client'
 const intersections = ref([])
 const showModal = ref(false)
 const editing = ref(null)
-const form = ref({ id: '', name: '', district: '', lat: 18.52, lng: 73.86 })
+const form = ref({ id: '', name: '', district: '', lat: 22.7196, lng: 75.8577 })
 
 function modeClass(m) {
   if (m === 'emergency') return 'badge-red'
@@ -109,7 +109,7 @@ function congestionClass(c) {
 
 function openCreate() {
   editing.value = null
-  form.value = { id: '', name: '', district: '', lat: 18.52, lng: 73.86 }
+  form.value = { id: '', name: '', district: '', lat: 22.7196, lng: 75.8577 }
   showModal.value = true
 }
 

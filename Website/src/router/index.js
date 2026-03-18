@@ -9,6 +9,7 @@ const routes = [
   { path: '/missions', name: 'Missions', component: () => import('../views/MissionsView.vue'), meta: { auth: true } },
   { path: '/alerts', name: 'Alerts', component: () => import('../views/AlertsView.vue'), meta: { auth: true } },
   { path: '/hospitals', name: 'Hospitals', component: () => import('../views/HospitalsView.vue'), meta: { auth: true } },
+  { path: '/mass-emergency', name: 'MassEmergency', component: () => import('../views/MassEmergencyView.vue'), meta: { auth: true } },
 ]
 
 const router = createRouter({

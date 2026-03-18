@@ -80,7 +80,7 @@
           <div class="progress-bar"><div class="fill blue" style="width: 100%"></div></div>
           <div class="sub" style="color: var(--text-secondary); font-size: 12px;">Synchronized intersections</div>
         </div>
-        
+
         <div class="bento-card standard-card">
           <div class="bento-header-inline">
             <div class="bento-label">Personnel</div>
@@ -100,6 +100,30 @@
           </div>
           <div class="value-medium">{{ stats.total_users }}</div>
           <div class="sub" style="color: var(--text-secondary); font-size: 12px;">All active accounts</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- City Intelligence Map -->
+    <div class="card pulse-map-card table-glass">
+      <div class="card-header">
+        <h3 class="glow-text">City Intelligence Map</h3>
+        <div class="live-indicator">
+          <span class="pulse-dot"></span> LIVE
+        </div>
+      </div>
+      <div id="city-map" class="city-map-container"></div>
+      <div class="map-legend">
+        <div class="legend-title">Legend</div>
+        <div class="legend-items">
+          <div class="legend-item"><span class="legend-dot" style="background: #ff5252;"></span> Emergency Signal</div>
+          <div class="legend-item"><span class="legend-dot" style="background: #ffd740;"></span> Manual Signal</div>
+          <div class="legend-item"><span class="legend-dot" style="background: #00e676;"></span> Automatic Signal</div>
+          <div class="legend-item"><span class="legend-dot" style="background: #42a5f5;"></span> Hospital</div>
+          <div class="legend-item"><span class="legend-dot" style="background: #ff6e40;"></span> Ambulance</div>
+          <div class="legend-item"><span class="legend-dot" style="background: #e040fb;"></span> Fire Truck</div>
+          <div class="legend-item"><span class="legend-dot" style="background: #40c4ff;"></span> Police</div>
+          <div class="legend-item"><span class="legend-dot" style="background: #eeff41;"></span> Other Vehicle</div>
         </div>
       </div>
     </div>
@@ -139,7 +163,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import api from '../api/client'
 
 const stats = ref({
@@ -148,6 +172,8 @@ const stats = ref({
   active_missions: 0, completed_missions: 0, active_alerts: 0,
 })
 const missions = ref([])
+
+let mapInstance = null
 
 function priorityClass(p) {
   if (p === 'critical') return 'badge-red'
@@ -159,6 +185,126 @@ function statusClass(s) {
   if (s === 'active') return 'badge-green'
   if (s === 'completed') return 'badge-blue'
   return 'badge-gray'
+}
+
+function getSignalColor(mode) {
+  if (mode === 'emergency') return '#ff5252'
+  if (mode === 'manual') return '#ffd740'
+  return '#00e676'
+}
+
+function getVehicleColor(type) {
+  const t = (type || '').toLowerCase()
+  if (t === 'ambulance') return '#ff6e40'
+  if (t === 'fire_truck' || t === 'fire truck') return '#e040fb'
+  if (t === 'police') return '#40c4ff'
+  return '#eeff41'
+}
+
+function initMap() {
+  const L = window.L
+  if (!L) {
+    console.error('Leaflet not loaded')
+    return
+  }
+
+  mapInstance = L.map('city-map', {
+    center: [22.7196, 75.8577],
+    zoom: 13,
+    zoomControl: true,
+    attributionControl: false,
+  })
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd',
+  }).addTo(mapInstance)
+
+  loadMapData()
+}
+
+async function loadMapData() {
+  const L = window.L
+  if (!L || !mapInstance) return
+
+  try {
+    const [intersectionsRes, hospitalsRes] = await Promise.all([
+      api.get('/admin/intersections'),
+      api.get('/admin/hospitals'),
+    ])
+
+    // Intersections as circle markers colored by signal_mode
+    const intersections = intersectionsRes.data || []
+    intersections.forEach((ix) => {
+      if (ix.latitude && ix.longitude) {
+        L.circleMarker([ix.latitude, ix.longitude], {
+          radius: 7,
+          fillColor: getSignalColor(ix.signal_mode),
+          color: 'rgba(255,255,255,0.3)',
+          weight: 1,
+          fillOpacity: 0.85,
+        })
+          .addTo(mapInstance)
+          .bindPopup(
+            `<div style="font-family:Inter,sans-serif;font-size:12px;">
+              <strong>${ix.name || 'Intersection #' + ix.id}</strong><br/>
+              Mode: <span style="color:${getSignalColor(ix.signal_mode)};font-weight:600">${ix.signal_mode || 'automatic'}</span>
+            </div>`
+          )
+      }
+    })
+
+    // Hospitals as blue cross markers
+    const hospitals = hospitalsRes.data || []
+    hospitals.forEach((h) => {
+      if (h.latitude && h.longitude) {
+        const crossIcon = L.divIcon({
+          className: 'hospital-marker',
+          html: `<div style="
+            width:20px;height:20px;display:flex;align-items:center;justify-content:center;
+            background:#42a5f5;border-radius:4px;color:#fff;font-weight:900;font-size:14px;
+            box-shadow:0 0 8px rgba(66,165,245,0.6);line-height:1;
+          ">+</div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        })
+        L.marker([h.latitude, h.longitude], { icon: crossIcon })
+          .addTo(mapInstance)
+          .bindPopup(
+            `<div style="font-family:Inter,sans-serif;font-size:12px;">
+              <strong>${h.name || 'Hospital'}</strong><br/>
+              ${h.address || ''}
+            </div>`
+          )
+      }
+    })
+
+    // Active missions - vehicle markers
+    const activeMissions = missions.value.filter((m) => m.status === 'active')
+    activeMissions.forEach((m) => {
+      const lat = m.current_latitude || m.origin_latitude
+      const lng = m.current_longitude || m.origin_longitude
+      if (lat && lng) {
+        L.circleMarker([lat, lng], {
+          radius: 9,
+          fillColor: getVehicleColor(m.vehicle_type),
+          color: '#fff',
+          weight: 2,
+          fillOpacity: 0.9,
+        })
+          .addTo(mapInstance)
+          .bindPopup(
+            `<div style="font-family:Inter,sans-serif;font-size:12px;">
+              <strong>${m.vehicle_name || 'Vehicle #' + m.vehicle_id}</strong><br/>
+              Type: ${m.vehicle_type || 'N/A'}<br/>
+              Mission: ${m.incident_type || 'N/A'}
+            </div>`
+          )
+      }
+    })
+  } catch (e) {
+    console.error('Failed to load map data', e)
+  }
 }
 
 async function loadStats() {
@@ -174,7 +320,11 @@ async function loadStats() {
   }
 }
 
-onMounted(loadStats)
+onMounted(async () => {
+  await loadStats()
+  await nextTick()
+  initMap()
+})
 </script>
 
 <style scoped>
@@ -543,6 +693,66 @@ onMounted(loadStats)
 @keyframes pulse-op {
   0% { opacity: 0.5; }
   100% { opacity: 1; }
+}
+
+/* City Intelligence Map */
+.pulse-map-card {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 36px;
+  background: var(--glass-surface);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.city-map-container {
+  height: 400px;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  z-index: 0;
+}
+
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+  flex-wrap: wrap;
+}
+
+.legend-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+
+.legend-items {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
 }
 
 @media (max-width: 1400px) {

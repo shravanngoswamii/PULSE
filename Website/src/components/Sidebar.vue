@@ -23,6 +23,7 @@
           <template v-if="item.icon === 'target'"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></template>
           <template v-if="item.icon === 'alert'"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></template>
           <template v-if="item.icon === 'hospital'"><path d="M3 3h18v18H3z"/><path d="M12 7v10"/><path d="M7 12h10"/></template>
+          <template v-if="item.icon === 'zap'"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></template>
         </svg>
         <span>{{ item.label }}</span>
       </router-link>
@@ -94,6 +95,7 @@ const navItems = [
   { path: '/missions', label: 'Missions', icon: 'target' },
   { path: '/alerts', label: 'Alerts', icon: 'alert' },
   { path: '/hospitals', label: 'Hospitals', icon: 'hospital' },
+  { path: '/mass-emergency', label: 'Mass Emergency', icon: 'zap' },
 ]
 
 function handleLogout() {

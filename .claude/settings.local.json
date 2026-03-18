@@ -21,7 +21,8 @@
       "Bash(python3 -c \"import ast; ast.parse\\(open\\(''schemas.py''\\).read\\(\\)\\); print\\(''schemas.py syntax OK''\\)\")",
       "Bash(flutter clean:*)",
       "Bash(flutter run:*)",
-      "Bash(dart run:*)"
+      "Bash(dart run:*)",
+      "Bash(npm run:*)"
     ]
   }
 }
