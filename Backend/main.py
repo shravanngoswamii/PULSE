@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from config import CORS_ORIGINS, HOST, PORT
 from database import engine, Base, get_db
 from models import Edge, Intersection, Hospital
-from routers import auth_router, driver_router, operator_router, admin_router, edge_router
+from routers import auth_router, driver_router, operator_router, admin_router, edge_router, emergency_router
 from websocket_manager import manager
 from traffic_simulator import simulator
 from database import SessionLocal
@@ -56,6 +56,7 @@ app.include_router(driver_router.router)
 app.include_router(operator_router.router)
 app.include_router(admin_router.router)
 app.include_router(edge_router.router)
+app.include_router(emergency_router.router)
 
 # Serve static files
 static_dir = Path(__file__).parent / "static"
@@ -199,6 +200,17 @@ async def ws_operator_personal(websocket: WebSocket, operator_id: str):
 @app.websocket("/ws/driver/{mission_id}")
 async def ws_driver(websocket: WebSocket, mission_id: str):
     room = f"driver_{mission_id}"
+    await manager.connect(websocket, room)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, room)
+
+
+@app.websocket("/ws/driver-user/{user_id}")
+async def ws_driver_user(websocket: WebSocket, user_id: str):
+    room = f"driver_{user_id}"
     await manager.connect(websocket, room)
     try:
         while True:

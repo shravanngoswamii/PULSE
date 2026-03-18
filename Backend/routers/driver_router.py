@@ -236,6 +236,17 @@ async def start_mission(req: MissionStartRequest, user: User = Depends(require_r
     db.commit()
     db.refresh(mission)
 
+    # Link emergency call to mission if this was a dispatch
+    from models import EmergencyCall
+    pending_call = db.query(EmergencyCall).filter(
+        EmergencyCall.assigned_vehicle_id == req.vehicle_id,
+        EmergencyCall.status.in_(["assigned", "in_progress"]),
+    ).first()
+    if pending_call:
+        pending_call.assigned_mission_id = mission.id
+        pending_call.status = "in_progress"
+        db.commit()
+
     # Store visualization data for the live visualizer
     live_missions_viz[mission.id] = {
         "mission_id": mission.id,

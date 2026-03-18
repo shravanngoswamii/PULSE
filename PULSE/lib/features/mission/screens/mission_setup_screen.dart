@@ -12,6 +12,7 @@ import 'package:pulse_ev/shared/widgets/section_card.dart';
 import 'package:pulse_ev/shared/widgets/loading_indicator.dart';
 import 'package:pulse_ev/shared/widgets/error_view.dart';
 import 'package:pulse_ev/features/auth/providers/user_provider.dart';
+import 'package:pulse_ev/features/dashboard/providers/dispatch_provider.dart';
 
 // Provider to get the current GPS position
 final currentPositionProvider = FutureProvider<Position?>((ref) async {
@@ -39,6 +40,48 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
   bool _autoDrive = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  PendingDispatch? _respondingToDispatch;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check if we're responding to an incoming dispatch
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final dispatch = ref.read(pendingDispatchDataProvider);
+      if (dispatch != null) {
+        setState(() {
+          _respondingToDispatch = dispatch;
+          // Ensure the incident type from dispatch is available in the dropdown
+          if (!_incidentTypes.contains(dispatch.incidentType)) {
+            _incidentTypes.add(dispatch.incidentType);
+          }
+          _selectedIncident = dispatch.incidentType;
+          // Map severity to priority
+          switch (dispatch.severity.toLowerCase()) {
+            case 'critical':
+              _selectedPriority = 'Critical';
+              break;
+            case 'high':
+              _selectedPriority = 'High';
+              break;
+            default:
+              _selectedPriority = 'Standard';
+          }
+          // Pre-select a custom hospital at the caller's location
+          _selectedHospital = HospitalModel(
+            id: 'dispatch-${dispatch.id}',
+            name: 'Patient Location (${dispatch.callerName})',
+            lat: dispatch.callerLat,
+            lng: dispatch.callerLng,
+            distanceKm: 0.0,
+            etaMinutes: 0.0,
+          );
+        });
+        // Clear the pending dispatch so it doesn't persist on revisit
+        ref.read(pendingDispatchDataProvider.notifier).state = null;
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -46,7 +89,7 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
     super.dispose();
   }
 
-  final List<String> _incidentTypes = [
+  final List<String> _incidentTypes = <String>[
     'Medical Emergency',
     'Accident',
     'Fire Response',
@@ -136,6 +179,46 @@ class _MissionSetupScreenState extends ConsumerState<MissionSetupScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                   child: Column(
                     children: [
+                      if (_respondingToDispatch != null)
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            gradient: AppColors.emergencyGradient,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.emergency_rounded, color: Colors.white, size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Responding to Emergency',
+                                      style: AppTextStyles.label.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Call from ${_respondingToDispatch!.callerName} - ${_respondingToDispatch!.incidentType}',
+                                      style: AppTextStyles.micro.copyWith(color: Colors.white70),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       SectionCard(
                         title: 'INCIDENT',
                         child: Column(

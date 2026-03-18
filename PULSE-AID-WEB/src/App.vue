@@ -1,307 +1,348 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import {
-  Ambulance,
-  BadgeAlert,
-  CarFront,
-  Clock3,
-  MapPin,
-  MessageSquareText,
-  Navigation,
-  Route,
-  ShieldCheck,
-  UserRound
-} from 'lucide-vue-next';
 
-const DEMO_ROUTE = [
-  { lat: 12.9716, lng: 77.5946 },
-  { lat: 12.9721, lng: 77.5957 },
-  { lat: 12.9727, lng: 77.5971 },
-  { lat: 12.9735, lng: 77.5988 },
-  { lat: 12.9748, lng: 77.6004 },
-  { lat: 12.9763, lng: 77.6021 },
-  { lat: 12.9778, lng: 77.6033 },
-  { lat: 12.9794, lng: 77.6048 },
-  { lat: 12.9809, lng: 77.6062 },
-  { lat: 12.9823, lng: 77.6076 },
-  { lat: 12.9835, lng: 77.6089 }
-];
+// ── State ──────────────────────────────────────────────────────────────────
+const screen = ref('phone'); // 'phone' | 'tracking' | 'emergency'
+const phone = ref('');
+const errorMsg = ref('');
+const loading = ref(false);
+const trackingData = ref(null);
+const pollingTimer = ref(null);
+const trackedPhone = ref('');
 
-const FALLBACK_PATIENT_LOCATION = { lat: 12.9844, lng: 77.6097 };
-const VEHICLE_SPEED_KMH = 34;
-const TRACKING_ID_PARAM_KEYS = ['tracking', 'mission', 'trackingId'];
+// Emergency form
+const emergencyForm = ref({
+  name: '',
+  phone: '',
+  lat: null,
+  lng: null,
+  incident_type: 'Medical Emergency',
+  description: '',
+  severity: 'high',
+});
+const gpsStatus = ref('');
+const emergencyLoading = ref(false);
+const emergencyError = ref('');
 
-const mapStatus = ref('Preparing live patient view...');
-const demoModeReason = ref('');
-const currentRouteIndex = ref(0);
-const etaMinutes = ref(0);
-const distanceRemainingKm = ref(0);
-const patientLocation = ref(null);
-const patientShareState = ref('idle');
-const patientShareMessage = ref('Tap the action below to alert the ambulance team that you are moving closer.');
-const driverInboxMessage = ref('No patient message has been sent yet.');
-const lastUpdatedAt = ref(new Date());
-
+// Map
 let map = null;
-let ambulanceMarker = null;
-let destinationMarker = null;
-let patientMarker = null;
+let vehicleMarker = null;
+let callerMarker = null;
 let routePolyline = null;
-let patientGuidePolyline = null;
-let simulationTimer = null;
 
-const trackingIdFromUrl = (() => {
-  const params = new URLSearchParams(window.location.search);
-  for (const key of TRACKING_ID_PARAM_KEYS) {
-    const value = params.get(key);
-    if (value) {
-      return value;
-    }
-  }
-  return null;
-})();
-
-if (trackingIdFromUrl && trackingIdFromUrl !== 'DEMO-TRACK-4821') {
-  demoModeReason.value = `Tracking ID ${trackingIdFromUrl} is not connected right now. Showing a guided demo mission instead.`;
-} else if (!trackingIdFromUrl) {
-  demoModeReason.value = 'No tracking ID was provided. Showing a guided demo mission for usability testing.';
-}
-
-const missionData = ref({
-  trackingId: trackingIdFromUrl || 'DEMO-TRACK-4821',
-  driverName: 'Rohit Kumar',
-  driverPhone: '+91 98765 12045',
-  vehicleName: 'ALS Ambulance',
-  vehicleNumber: 'KA 03 MX 2147',
-  hospitalName: 'Prayatna Emergency Response Unit',
-  routeName: 'Richmond Circle to Langford Road pickup',
-  status: 'Driver en route to patient',
-  patientName: 'Patient pickup',
-  priority: 'High',
-  route: DEMO_ROUTE
+// ── Helpers ────────────────────────────────────────────────────────────────
+const statusLabel = computed(() => {
+  if (!trackingData.value) return '';
+  const s = trackingData.value.status || trackingData.value.mission_status;
+  if (s === 'completed') return 'Completed';
+  if (s === 'in_progress' || s === 'active') return 'En Route';
+  if (s === 'assigned') return 'Assigned';
+  if (s === 'pending') return 'Pending';
+  return s || 'Unknown';
 });
 
-const ambulancePosition = computed(() => missionData.value.route[currentRouteIndex.value]);
-const destinationPosition = computed(() => missionData.value.route[missionData.value.route.length - 1]);
-
-const statusPill = computed(() => {
-  if (patientShareState.value === 'shared') {
-    return 'Patient moving toward ambulance';
-  }
-  return missionData.value.status;
+const statusColor = computed(() => {
+  const s = statusLabel.value;
+  if (s === 'Assigned') return '#fbbf24';
+  if (s === 'En Route') return '#2dd4bf';
+  if (s === 'Arriving' || s === 'Completed') return '#34d399';
+  return '#94a3b8';
 });
 
-const progressPercent = computed(() => {
-  const maxIndex = missionData.value.route.length - 1;
-  if (maxIndex <= 0) {
-    return 0;
-  }
-  return Math.min(100, Math.round((currentRouteIndex.value / maxIndex) * 100));
+const etaDisplay = computed(() => {
+  if (!trackingData.value) return '--';
+  const eta = trackingData.value.mission_eta;
+  if (eta == null) return '--';
+  if (eta < 1) return '< 1 min';
+  return `${Math.round(eta)} min`;
 });
 
-const lastUpdatedLabel = computed(() => {
-  const seconds = Math.max(0, Math.round((Date.now() - lastUpdatedAt.value.getTime()) / 1000));
-  if (seconds < 5) {
-    return 'updated just now';
-  }
-  return `updated ${seconds}s ago`;
+const distanceDisplay = computed(() => {
+  if (!trackingData.value) return '--';
+  const d = trackingData.value.mission_distance_km;
+  if (d == null) return '--';
+  return `${d.toFixed(2)} km`;
 });
 
-const formatCoordinate = (value) => value.toFixed(5);
-
-const toRadians = (value) => (value * Math.PI) / 180;
-
-const calculateDistanceKm = (start, end) => {
-  const earthRadiusKm = 6371;
-  const latDiff = toRadians(end.lat - start.lat);
-  const lngDiff = toRadians(end.lng - start.lng);
-  const startLat = toRadians(start.lat);
-  const endLat = toRadians(end.lat);
-
-  const haversine =
-    Math.sin(latDiff / 2) * Math.sin(latDiff / 2) +
-    Math.sin(lngDiff / 2) * Math.sin(lngDiff / 2) * Math.cos(startLat) * Math.cos(endLat);
-
-  const angularDistance = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-  return earthRadiusKm * angularDistance;
-};
-
-const remainingDistanceFromIndex = (startIndex) => {
-  let total = 0;
-
-  for (let index = startIndex; index < missionData.value.route.length - 1; index += 1) {
-    total += calculateDistanceKm(missionData.value.route[index], missionData.value.route[index + 1]);
-  }
-
-  return total;
-};
-
-const updateMetrics = () => {
-  distanceRemainingKm.value = remainingDistanceFromIndex(currentRouteIndex.value);
-  etaMinutes.value = Math.max(1, Math.round((distanceRemainingKm.value / VEHICLE_SPEED_KMH) * 60));
-  lastUpdatedAt.value = new Date();
-};
-
-const createLabeledIcon = (label, className) =>
+// ── Map Icons ──────────────────────────────────────────────────────────────
+const createIcon = (label, gradient) =>
   L.divIcon({
-    className: `map-badge ${className}`,
-    html: `<span>${label}</span>`,
-    iconSize: [54, 54],
-    iconAnchor: [27, 27]
+    className: 'pulse-map-icon',
+    html: `<div style="
+      width:44px;height:44px;border-radius:50%;
+      background:${gradient};
+      border:3px solid rgba(255,255,255,0.9);
+      box-shadow:0 4px 16px rgba(0,0,0,0.4);
+      display:flex;align-items:center;justify-content:center;
+      font-size:0.7rem;font-weight:800;color:#fff;
+      letter-spacing:0.02em;
+    ">${label}</div>`,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
   });
 
-const ambulanceIcon = createLabeledIcon('AMB', 'map-badge-ambulance');
-const destinationIcon = createLabeledIcon('YOU', 'map-badge-destination');
-const patientIcon = createLabeledIcon('PAT', 'map-badge-patient');
+const ambulanceIcon = createIcon('AMB', 'radial-gradient(circle at 30% 30%, #fb7185, #dc2626)');
+const callerIcon = createIcon('YOU', 'radial-gradient(circle at 30% 30%, #5eead4, #0f766e)');
 
-const updatePatientGuide = () => {
-  if (!map || !patientLocation.value || !ambulancePosition.value) {
+// ── API Calls ──────────────────────────────────────────────────────────────
+async function trackEmergency(phoneNumber) {
+  const cleanPhone = phoneNumber.replace(/[\s\-()]/g, '');
+  const encoded = encodeURIComponent(cleanPhone);
+  const res = await fetch(`/api/emergency/track/${encoded}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || 'No active emergency found for this number');
+  }
+  return await res.json();
+}
+
+async function callEmergency(data) {
+  const res = await fetch('/api/emergency/call', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || 'Failed to create emergency call');
+  }
+  return await res.json();
+}
+
+// ── Phone Screen Actions ───────────────────────────────────────────────────
+async function submitPhone() {
+  const fullPhone = phone.value.startsWith('+') ? phone.value : `+91${phone.value}`;
+  if (fullPhone.replace(/\D/g, '').length < 10) {
+    errorMsg.value = 'Please enter a valid phone number';
     return;
   }
+  loading.value = true;
+  errorMsg.value = '';
+  try {
+    const data = await trackEmergency(fullPhone);
+    trackingData.value = data;
+    trackedPhone.value = fullPhone;
+    screen.value = 'tracking';
+    await nextTick();
+    initMap();
+    startPolling();
+  } catch (err) {
+    errorMsg.value = err.message;
+  } finally {
+    loading.value = false;
+  }
+}
 
-  const line = [
-    [patientLocation.value.lat, patientLocation.value.lng],
-    [ambulancePosition.value.lat, ambulancePosition.value.lng]
-  ];
+// ── Polling for live updates ───────────────────────────────────────────────
+function startPolling() {
+  stopPolling();
+  pollingTimer.value = setInterval(async () => {
+    try {
+      const data = await trackEmergency(trackedPhone.value);
+      trackingData.value = data;
+      updateMap();
+    } catch {
+      // Keep showing last known data
+    }
+  }, 3000);
+}
 
-  if (patientGuidePolyline) {
-    patientGuidePolyline.setLatLngs(line);
-  } else {
-    patientGuidePolyline = L.polyline(line, {
-      color: '#fbbf24',
-      weight: 3,
-      opacity: 0.9,
-      dashArray: '7 9'
+function stopPolling() {
+  if (pollingTimer.value) {
+    clearInterval(pollingTimer.value);
+    pollingTimer.value = null;
+  }
+}
+
+// ── Map ────────────────────────────────────────────────────────────────────
+function initMap() {
+  if (map) {
+    map.remove();
+    map = null;
+  }
+  vehicleMarker = null;
+  callerMarker = null;
+  routePolyline = null;
+
+  const d = trackingData.value;
+  if (!d) return;
+
+  const center = [d.caller_lat || 22.72, d.caller_lng || 75.86];
+
+  map = L.map('tracking-map', { zoomControl: false, attributionControl: false }).setView(center, 14);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OSM &copy; CARTO',
+  }).addTo(map);
+
+  // Caller marker
+  callerMarker = L.marker(center, { icon: callerIcon }).addTo(map);
+  callerMarker.bindPopup('Your Location');
+
+  // Vehicle marker
+  if (d.vehicle_lat && d.vehicle_lng) {
+    vehicleMarker = L.marker([d.vehicle_lat, d.vehicle_lng], { icon: ambulanceIcon }).addTo(map);
+    vehicleMarker.bindPopup('Ambulance');
+  }
+
+  // Route polyline
+  if (d.road_coordinates && d.road_coordinates.length > 1) {
+    const latlngs = d.road_coordinates.map((c) => [c.lat, c.lng]);
+    routePolyline = L.polyline(latlngs, {
+      color: '#2dd4bf',
+      weight: 5,
+      opacity: 0.85,
     }).addTo(map);
   }
-};
 
-const updateAmbulanceLocation = () => {
-  if (!map || !ambulanceMarker || !ambulancePosition.value) {
-    return;
-  }
+  // Fit bounds
+  fitMapBounds();
+}
 
-  ambulanceMarker.setLatLng([ambulancePosition.value.lat, ambulancePosition.value.lng]);
-  updateMetrics();
-  updatePatientGuide();
-};
+function updateMap() {
+  const d = trackingData.value;
+  if (!d || !map) return;
 
-const startSimulation = () => {
-  updateMetrics();
-
-  simulationTimer = window.setInterval(() => {
-    if (currentRouteIndex.value >= missionData.value.route.length - 1) {
-      missionData.value.status = 'Ambulance has reached your pickup point';
-      mapStatus.value = 'Ambulance reached destination. Demo mission complete.';
-      window.clearInterval(simulationTimer);
-      simulationTimer = null;
-      return;
+  // Update vehicle position
+  if (d.vehicle_lat && d.vehicle_lng) {
+    if (vehicleMarker) {
+      vehicleMarker.setLatLng([d.vehicle_lat, d.vehicle_lng]);
+    } else {
+      vehicleMarker = L.marker([d.vehicle_lat, d.vehicle_lng], { icon: ambulanceIcon }).addTo(map);
+      vehicleMarker.bindPopup('Ambulance');
     }
-
-    currentRouteIndex.value += 1;
-    missionData.value.status = patientShareState.value === 'shared'
-      ? 'Driver coordinating with patient live location'
-      : 'Ambulance is actively approaching the pickup point';
-    mapStatus.value = 'Ambulance location updated from demo simulator.';
-    updateAmbulanceLocation();
-  }, 2800);
-};
-
-const initMap = async () => {
-  await nextTick();
-
-  const route = missionData.value.route.map((point) => [point.lat, point.lng]);
-  map = L.map('map', { zoomControl: false, attributionControl: true }).setView(route[0], 14);
-
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-  }).addTo(map);
-
-  routePolyline = L.polyline(route, {
-    color: '#2dd4bf',
-    weight: 6,
-    opacity: 0.95
-  }).addTo(map);
-
-  ambulanceMarker = L.marker(route[0], { icon: ambulanceIcon }).addTo(map);
-  destinationMarker = L.marker(route[route.length - 1], { icon: destinationIcon }).addTo(map);
-
-  ambulanceMarker.bindPopup('Ambulance live position');
-  destinationMarker.bindPopup('Patient pickup zone');
-
-  map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
-  updateMetrics();
-};
-
-const applyPatientLocation = (location, sourceLabel) => {
-  patientLocation.value = location;
-  patientShareState.value = 'shared';
-  patientShareMessage.value = `Your location was shared with the ambulance team using ${sourceLabel}. Stay visible and keep your phone nearby.`;
-  driverInboxMessage.value = `Patient is closing toward the ambulance. Shared coordinates: ${formatCoordinate(location.lat)}, ${formatCoordinate(location.lng)}.`;
-  missionData.value.status = 'Driver coordinating with patient live location';
-  mapStatus.value = 'Patient location shared with driver demo console.';
-
-  if (patientMarker) {
-    patientMarker.setLatLng([location.lat, location.lng]);
-  } else if (map) {
-    patientMarker = L.marker([location.lat, location.lng], { icon: patientIcon }).addTo(map);
-    patientMarker.bindPopup('Patient shared position');
   }
 
-  updatePatientGuide();
-
-  if (map && ambulanceMarker && patientMarker) {
-    const group = L.featureGroup([ambulanceMarker, destinationMarker, patientMarker]);
-    map.fitBounds(group.getBounds(), { padding: [80, 80] });
-  }
-};
-
-const sendClosingTowardsYou = async () => {
-  if (patientShareState.value === 'sharing') {
-    return;
+  // Update caller marker
+  if (d.caller_lat && d.caller_lng && callerMarker) {
+    callerMarker.setLatLng([d.caller_lat, d.caller_lng]);
   }
 
-  patientShareState.value = 'sharing';
-  patientShareMessage.value = 'Getting your location and notifying the ambulance driver...';
-
-  if (!navigator.geolocation) {
-    applyPatientLocation(FALLBACK_PATIENT_LOCATION, 'demo fallback');
-    return;
+  // Update route
+  if (d.road_coordinates && d.road_coordinates.length > 1) {
+    const latlngs = d.road_coordinates.map((c) => [c.lat, c.lng]);
+    if (routePolyline) {
+      routePolyline.setLatLngs(latlngs);
+    } else {
+      routePolyline = L.polyline(latlngs, {
+        color: '#2dd4bf',
+        weight: 5,
+        opacity: 0.85,
+      }).addTo(map);
+    }
   }
+}
 
+function fitMapBounds() {
+  if (!map) return;
+  const markers = [];
+  if (callerMarker) markers.push(callerMarker);
+  if (vehicleMarker) markers.push(vehicleMarker);
+  if (markers.length > 1) {
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds(), { padding: [60, 60] });
+  } else if (routePolyline) {
+    map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
+  }
+}
+
+// ── Share Location ─────────────────────────────────────────────────────────
+function shareMyLocation() {
+  if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
-    (position) => {
-      applyPatientLocation(
-        {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        },
-        'live browser GPS'
-      );
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      if (callerMarker && map) {
+        callerMarker.setLatLng([latitude, longitude]);
+        fitMapBounds();
+      }
+    },
+    () => {},
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+  );
+}
+
+// ── Emergency Form ─────────────────────────────────────────────────────────
+function goToEmergency() {
+  screen.value = 'emergency';
+  detectLocation();
+}
+
+function detectLocation() {
+  if (!navigator.geolocation) {
+    gpsStatus.value = 'Geolocation not supported';
+    return;
+  }
+  gpsStatus.value = 'Detecting your location...';
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      emergencyForm.value.lat = pos.coords.latitude;
+      emergencyForm.value.lng = pos.coords.longitude;
+      gpsStatus.value = `Location detected: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
     },
     () => {
-      applyPatientLocation(FALLBACK_PATIENT_LOCATION, 'demo fallback');
+      gpsStatus.value = 'Could not detect location. Enter manually below.';
     },
-    {
-      enableHighAccuracy: true,
-      timeout: 5000,
-      maximumAge: 0
-    }
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
-};
+}
 
-onMounted(async () => {
-  await initMap();
-  startSimulation();
-});
-
-onUnmounted(() => {
-  if (simulationTimer) {
-    window.clearInterval(simulationTimer);
+async function submitEmergency() {
+  const f = emergencyForm.value;
+  if (!f.phone || f.phone.replace(/\D/g, '').length < 10) {
+    emergencyError.value = 'Please enter a valid phone number';
+    return;
+  }
+  if (!f.lat || !f.lng) {
+    emergencyError.value = 'Location is required. Please allow GPS or enter coordinates manually.';
+    return;
   }
 
+  emergencyLoading.value = true;
+  emergencyError.value = '';
+  try {
+    const fullPhone = f.phone.startsWith('+') ? f.phone : `+91${f.phone}`;
+    const data = await callEmergency({
+      caller_name: f.name || 'Unknown',
+      caller_phone: fullPhone,
+      caller_lat: parseFloat(f.lat),
+      caller_lng: parseFloat(f.lng),
+      incident_type: f.incident_type,
+      severity: f.severity,
+      description: f.description,
+    });
+    trackingData.value = data;
+    trackedPhone.value = fullPhone;
+    screen.value = 'tracking';
+    await nextTick();
+    initMap();
+    startPolling();
+  } catch (err) {
+    emergencyError.value = err.message;
+  } finally {
+    emergencyLoading.value = false;
+  }
+}
+
+// ── Back navigation ────────────────────────────────────────────────────────
+function goBack() {
+  stopPolling();
+  if (map) {
+    map.remove();
+    map = null;
+  }
+  vehicleMarker = null;
+  callerMarker = null;
+  routePolyline = null;
+  trackingData.value = null;
+  errorMsg.value = '';
+  screen.value = 'phone';
+}
+
+// ── Lifecycle ──────────────────────────────────────────────────────────────
+onUnmounted(() => {
+  stopPolling();
   if (map) {
     map.remove();
     map = null;
@@ -311,570 +352,774 @@ onUnmounted(() => {
 
 <template>
   <div class="app-shell">
+    <!-- ─── HEADER ──────────────────────────────────────────────── -->
     <header class="topbar glass-panel">
-      <div>
-        <p class="eyebrow">Patient tracking view</p>
-        <div class="brand-row">
-          <img src="/logo.png" alt="Pulse Aid" class="brand-logo" />
-          <div>
-            <h1>PULSE AID</h1>
-            <p class="subtext">Ambulance tracking and patient coordination demo</p>
-          </div>
+      <div class="brand-row">
+        <img src="/logo.png" alt="Pulse Aid" class="brand-logo" />
+        <div>
+          <h1 class="gradient-text">PULSE AID</h1>
+          <p class="subtext">Emergency Ambulance Tracking</p>
         </div>
       </div>
-
-      <div class="status-cluster">
-        <div class="tracking-chip">
-          <span class="live-dot"></span>
-          <span>{{ statusPill }}</span>
+      <div v-if="screen === 'tracking' && trackingData" class="status-cluster">
+        <div class="tracking-chip" :style="{ background: `${statusColor}22`, color: statusColor }">
+          <span class="live-dot" :style="{ background: statusColor }"></span>
+          <span>{{ statusLabel }}</span>
         </div>
-        <p class="tracking-id">Tracking ID: {{ missionData.trackingId }}</p>
       </div>
     </header>
 
-    <main class="layout-grid">
-      <section class="left-rail">
-        <article class="hero-card glass-panel">
-          <div class="hero-copy">
-            <p class="section-label">Emergency response</p>
-            <h2>Ambulance is on the way to you</h2>
-            <p>
-              This page is now running in demo mode with in-browser data so you can test the patient-side
-              experience without a backend connection.
-            </p>
+    <!-- ═══════════════════════════════════════════════════════════
+         SCREEN 1: PHONE ENTRY
+         ═══════════════════════════════════════════════════════════ -->
+    <main v-if="screen === 'phone'" class="center-screen">
+      <section class="phone-card glass-panel">
+        <div class="phone-card-inner">
+          <div class="icon-circle">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/>
+              <path d="M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z"/>
+            </svg>
           </div>
-          <div v-if="demoModeReason" class="demo-banner">
-            <BadgeAlert :size="18" />
-            <span>{{ demoModeReason }}</span>
-          </div>
-        </article>
+          <h2>Track Your Ambulance</h2>
+          <p class="helper">Enter your phone number to see real-time ambulance location</p>
 
-        <article class="details-card glass-panel">
-          <div class="card-header">
-            <h3>Driver and vehicle</h3>
-            <span class="helper-text">{{ lastUpdatedLabel }}</span>
-          </div>
-
-          <div class="detail-grid">
-            <div class="detail-item">
-              <UserRound :size="18" />
-              <div>
-                <label>Driver</label>
-                <strong>{{ missionData.driverName }}</strong>
-                <p>{{ missionData.driverPhone }}</p>
-              </div>
-            </div>
-
-            <div class="detail-item">
-              <CarFront :size="18" />
-              <div>
-                <label>Vehicle</label>
-                <strong>{{ missionData.vehicleName }}</strong>
-                <p>{{ missionData.vehicleNumber }}</p>
-              </div>
-            </div>
-
-            <div class="detail-item">
-              <Route :size="18" />
-              <div>
-                <label>Route</label>
-                <strong>{{ missionData.routeName }}</strong>
-                <p>{{ missionData.hospitalName }}</p>
-              </div>
-            </div>
-
-            <div class="detail-item">
-              <ShieldCheck :size="18" />
-              <div>
-                <label>Priority</label>
-                <strong>{{ missionData.priority }}</strong>
-                <p>PULSE guidance active for the corridor</p>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article class="metrics-card glass-panel">
-          <div class="metric">
-            <Clock3 :size="18" />
-            <div>
-              <label>ETA</label>
-              <strong>{{ etaMinutes }} min</strong>
-            </div>
+          <div class="input-row">
+            <span class="country-code">+91</span>
+            <input
+              v-model="phone"
+              type="tel"
+              placeholder="Enter phone number"
+              class="phone-input"
+              maxlength="15"
+              @keyup.enter="submitPhone"
+            />
           </div>
 
-          <div class="metric">
-            <Navigation :size="18" />
-            <div>
-              <label>Distance left</label>
-              <strong>{{ distanceRemainingKm.toFixed(2) }} km</strong>
-            </div>
-          </div>
-
-          <div class="metric">
-            <Ambulance :size="18" />
-            <div>
-              <label>Progress</label>
-              <strong>{{ progressPercent }}%</strong>
-            </div>
-          </div>
-        </article>
-
-        <article class="patient-action-card glass-panel">
-          <div class="card-header">
-            <h3>Patient action</h3>
-            <span class="helper-text">Two-way coordination</span>
-          </div>
-
-          <p class="action-copy">
-            If you are moving toward the ambulance, notify the driver. Your location will be shared on this demo map.
-          </p>
-
-          <button class="primary-button" type="button" @click="sendClosingTowardsYou">
-            <MessageSquareText :size="18" />
-            <span>CLOSING TOWARDS YOU</span>
+          <button class="primary-button" :disabled="loading" @click="submitPhone">
+            <span v-if="loading" class="spinner"></span>
+            <span v-else>Track My Ambulance</span>
           </button>
 
-          <p class="share-message">{{ patientShareMessage }}</p>
+          <p v-if="errorMsg" class="error-text">{{ errorMsg }}</p>
 
-          <div class="driver-inbox">
-            <label>Driver receives</label>
-            <p>{{ driverInboxMessage }}</p>
+          <div class="divider">
+            <span>OR</span>
           </div>
 
-          <div v-if="patientLocation" class="patient-coordinates">
-            <MapPin :size="16" />
-            <span>
-              Shared patient position: {{ formatCoordinate(patientLocation.lat) }},
-              {{ formatCoordinate(patientLocation.lng) }}
-            </span>
+          <button class="secondary-button" @click="goToEmergency">
+            Call Emergency
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SCREEN 2: LIVE TRACKING
+         ═══════════════════════════════════════════════════════════ -->
+    <main v-else-if="screen === 'tracking'" class="tracking-layout">
+      <section class="info-panel">
+        <!-- Back button -->
+        <button class="back-btn" @click="goBack">&larr; Back</button>
+
+        <!-- ETA + Distance -->
+        <article class="metrics-row glass-panel">
+          <div class="metric">
+            <label>ETA</label>
+            <strong>{{ etaDisplay }}</strong>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric">
+            <label>Distance</label>
+            <strong>{{ distanceDisplay }}</strong>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric">
+            <label>Status</label>
+            <strong :style="{ color: statusColor }">{{ statusLabel }}</strong>
           </div>
         </article>
+
+        <!-- Driver & Vehicle Info -->
+        <article v-if="trackingData" class="details-card glass-panel">
+          <h3>Driver &amp; Vehicle</h3>
+          <div class="detail-grid">
+            <div class="detail-item" v-if="trackingData.driver_name">
+              <label>Driver</label>
+              <strong>{{ trackingData.driver_name }}</strong>
+              <p v-if="trackingData.driver_phone">{{ trackingData.driver_phone }}</p>
+            </div>
+            <div class="detail-item" v-if="trackingData.vehicle_name">
+              <label>Vehicle</label>
+              <strong>{{ trackingData.vehicle_name }}</strong>
+              <p v-if="trackingData.vehicle_type">{{ trackingData.vehicle_type }}</p>
+            </div>
+            <div class="detail-item" v-if="trackingData.incident_type">
+              <label>Incident</label>
+              <strong>{{ trackingData.incident_type }}</strong>
+              <p>Severity: {{ trackingData.severity || 'high' }}</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- Vehicle Coordinates -->
+        <article v-if="trackingData && trackingData.vehicle_lat" class="coords-card glass-panel">
+          <label>Vehicle Position</label>
+          <p>{{ trackingData.vehicle_lat?.toFixed(5) }}, {{ trackingData.vehicle_lng?.toFixed(5) }}</p>
+        </article>
+
+        <!-- Share location -->
+        <button class="secondary-button share-btn" @click="shareMyLocation">
+          Share My Location
+        </button>
       </section>
 
-      <section class="map-panel glass-panel">
-        <div class="map-header">
-          <div>
-            <p class="section-label">Live route</p>
-            <h3>Ambulance and patient coordination map</h3>
-          </div>
-          <p class="map-status">{{ mapStatus }}</p>
-        </div>
-
-        <div id="map"></div>
-
-        <div class="map-footer">
+      <section class="map-container glass-panel">
+        <div id="tracking-map"></div>
+        <div class="map-legend">
           <div class="legend-item">
-            <span class="legend-swatch ambulance"></span>
+            <span class="legend-dot" style="background:#dc2626"></span>
             <span>Ambulance</span>
           </div>
           <div class="legend-item">
-            <span class="legend-swatch destination"></span>
-            <span>Pickup point</span>
+            <span class="legend-dot" style="background:#0f766e"></span>
+            <span>Your Location</span>
           </div>
           <div class="legend-item">
-            <span class="legend-swatch patient"></span>
-            <span>Patient shared location</span>
+            <span class="legend-dot" style="background:#2dd4bf"></span>
+            <span>Route</span>
           </div>
         </div>
+      </section>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SCREEN 3: EMERGENCY CALL FORM
+         ═══════════════════════════════════════════════════════════ -->
+    <main v-else-if="screen === 'emergency'" class="center-screen">
+      <section class="emergency-card glass-panel">
+        <button class="back-btn" @click="screen = 'phone'">&larr; Back</button>
+        <h2>Call Emergency</h2>
+        <p class="helper">Fill in your details to dispatch an ambulance to your location</p>
+
+        <div class="form-group">
+          <label>Your Name</label>
+          <input v-model="emergencyForm.name" type="text" placeholder="Full name" class="form-input" />
+        </div>
+
+        <div class="form-group">
+          <label>Phone Number</label>
+          <div class="input-row">
+            <span class="country-code">+91</span>
+            <input v-model="emergencyForm.phone" type="tel" placeholder="Phone number" class="phone-input" maxlength="15" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Location</label>
+          <p class="gps-status">{{ gpsStatus }}</p>
+          <div class="coords-row">
+            <input v-model="emergencyForm.lat" type="number" step="any" placeholder="Latitude" class="form-input coord-input" />
+            <input v-model="emergencyForm.lng" type="number" step="any" placeholder="Longitude" class="form-input coord-input" />
+          </div>
+          <button class="text-btn" @click="detectLocation">Re-detect GPS</button>
+        </div>
+
+        <div class="form-group">
+          <label>Incident Type</label>
+          <select v-model="emergencyForm.incident_type" class="form-input">
+            <option>Medical Emergency</option>
+            <option>Accident</option>
+            <option>Fire</option>
+            <option>Police</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Description</label>
+          <textarea v-model="emergencyForm.description" rows="3" placeholder="Describe the situation..." class="form-input form-textarea"></textarea>
+        </div>
+
+        <button class="emergency-button" :disabled="emergencyLoading" @click="submitEmergency">
+          <span v-if="emergencyLoading" class="spinner"></span>
+          <span v-else>CALL EMERGENCY</span>
+        </button>
+
+        <p v-if="emergencyError" class="error-text">{{ emergencyError }}</p>
       </section>
     </main>
   </div>
 </template>
 
 <style scoped>
+/* ─── Shell ──────────────────────────────────────────────────────────────── */
 .app-shell {
   min-height: 100vh;
-  padding: 24px;
+  padding: 16px;
   background:
-    radial-gradient(circle at top left, rgba(45, 212, 191, 0.18), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.2), transparent 30%),
+    radial-gradient(circle at top left, rgba(45, 212, 191, 0.15), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.15), transparent 32%),
     linear-gradient(160deg, #07111a 0%, #0b1622 42%, #111827 100%);
-}
-
-.topbar,
-.left-rail,
-.map-panel {
-  position: relative;
-  z-index: 1;
 }
 
 .glass-panel {
   background: rgba(9, 17, 28, 0.78);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.32);
-  backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 16px 48px rgba(2, 6, 23, 0.3);
+  backdrop-filter: blur(14px);
+  border-radius: 20px;
 }
 
+/* ─── Header ─────────────────────────────────────────────────────────────── */
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 24px;
-  padding: 20px 24px;
-  border-radius: 24px;
-  margin-bottom: 20px;
-}
-
-.eyebrow,
-.section-label,
-.helper-text,
-.detail-item label,
-.metric label,
-.driver-inbox label {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.72rem;
-  color: #93a4b8;
+  padding: 16px 20px;
+  margin-bottom: 16px;
 }
 
 .brand-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .brand-logo {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
 }
 
 .brand-row h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   letter-spacing: 0.08em;
 }
 
 .subtext {
-  margin-top: 4px;
-  color: #c2d0dd;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  margin-top: 2px;
 }
 
 .status-cluster {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: center;
 }
 
 .tracking-chip {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(15, 118, 110, 0.22);
-  color: #ccfbf1;
   font-weight: 600;
+  font-size: 0.88rem;
 }
 
 .live-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #5eead4;
-  box-shadow: 0 0 0 0 rgba(94, 234, 212, 0.7);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
   animation: pulse-dot 1.6s infinite;
 }
 
-.tracking-id {
-  color: #c7d5e0;
-  font-size: 0.95rem;
+@keyframes pulse-dot {
+  0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(45, 212, 191, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); }
 }
 
-.layout-grid {
-  display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
-  gap: 20px;
-  min-height: calc(100vh - 140px);
-}
-
-.left-rail {
-  display: grid;
-  grid-template-rows: auto auto auto 1fr;
-  gap: 16px;
-}
-
-.hero-card,
-.details-card,
-.metrics-card,
-.patient-action-card,
-.map-panel {
-  border-radius: 24px;
-}
-
-.hero-card,
-.details-card,
-.patient-action-card {
-  padding: 22px;
-}
-
-.hero-copy h2,
-.map-header h3,
-.card-header h3 {
-  margin: 6px 0 10px;
-}
-
-.hero-copy p,
-.action-copy,
-.share-message,
-.driver-inbox p,
-.detail-item p,
-.map-status {
-  color: #c6d4df;
-  line-height: 1.5;
-}
-
-.demo-banner {
-  margin-top: 18px;
+/* ─── Center Screen (Phone / Emergency) ──────────────────────────────────── */
+.center-screen {
   display: flex;
-  gap: 10px;
+  justify-content: center;
   align-items: flex-start;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(251, 191, 36, 0.12);
-  color: #fde68a;
+  padding-top: 4vh;
 }
 
-.card-header {
+.phone-card,
+.emergency-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 28px;
+}
+
+.phone-card-inner {
+  text-align: center;
+}
+
+.icon-circle {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: rgba(45, 212, 191, 0.12);
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.detail-grid {
-  display: grid;
-  gap: 16px;
-}
-
-.detail-item {
-  display: grid;
-  grid-template-columns: 18px 1fr;
-  gap: 12px;
-  align-items: start;
-}
-
-.detail-item strong,
-.metric strong {
-  display: block;
-  margin-top: 4px;
-  font-size: 1rem;
-}
-
-.detail-item p {
-  margin-top: 4px;
-  font-size: 0.92rem;
-}
-
-.metrics-card {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(45, 212, 191, 0.32), rgba(59, 130, 246, 0.16));
-}
-
-.metric {
-  background: rgba(9, 17, 28, 0.94);
-  padding: 20px 18px;
-  display: flex;
-  gap: 12px;
   align-items: center;
+  justify-content: center;
 }
 
+.phone-card h2,
+.emergency-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+}
+
+.helper {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  margin-bottom: 24px;
+  line-height: 1.4;
+}
+
+/* ─── Input Row ──────────────────────────────────────────────────────────── */
+.input-row {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.6);
+  overflow: hidden;
+}
+
+.country-code {
+  padding: 0 14px;
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.phone-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: #f8fafc;
+  padding: 14px 16px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.phone-input::placeholder {
+  color: #475569;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
 .primary-button {
   margin-top: 18px;
   width: 100%;
   border: none;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #f97316, #fb7185);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #14b8a6, #0ea5e9);
   color: white;
-  padding: 16px 18px;
+  padding: 15px 18px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  display: inline-flex;
-  gap: 10px;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.25);
+  display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 18px 30px rgba(251, 113, 133, 0.22);
+  gap: 8px;
+  font-family: inherit;
 }
 
-.primary-button:hover {
+.primary-button:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
-.share-message {
-  margin-top: 14px;
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.driver-inbox {
-  margin-top: 18px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.14);
+.secondary-button {
+  margin-top: 0;
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.5);
+  color: #e2e8f0;
+  padding: 14px 18px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: inherit;
 }
 
-.driver-inbox p {
-  margin-top: 8px;
+.secondary-button:hover {
+  background: rgba(30, 41, 59, 0.7);
 }
 
-.patient-coordinates {
-  display: inline-flex;
+.emergency-button {
+  margin-top: 24px;
+  width: 100%;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  padding: 16px 18px;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+  transition: transform 0.15s ease;
+  font-family: inherit;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  margin-top: 16px;
-  color: #f8fafc;
-  font-size: 0.93rem;
 }
 
-.map-panel {
-  padding: 18px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
+.emergency-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.emergency-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.text-btn {
+  background: none;
+  border: none;
+  color: #2dd4bf;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 14px;
+  font-family: inherit;
+}
+
+.back-btn:hover {
+  color: #e2e8f0;
+}
+
+/* ─── Divider ────────────────────────────────────────────────────────────── */
+.divider {
+  display: flex;
+  align-items: center;
   gap: 14px;
+  margin: 22px 0;
+  color: #475569;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+/* ─── Error / Spinner ────────────────────────────────────────────────────── */
+.error-text {
+  color: #fb7185;
+  margin-top: 14px;
+  font-size: 0.9rem;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Tracking Layout ────────────────────────────────────────────────────── */
+.tracking-layout {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
+  min-height: calc(100vh - 110px);
+}
+
+.info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── Metrics Row ────────────────────────────────────────────────────────── */
+.metrics-row {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  overflow: hidden;
+}
+
+.metric {
+  flex: 1;
+  padding: 16px 14px;
+  text-align: center;
+}
+
+.metric label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.metric strong {
+  font-size: 1.05rem;
+  display: block;
+}
+
+.metric-divider {
+  width: 1px;
+  height: 36px;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+/* ─── Details Card ───────────────────────────────────────────────────────── */
+.details-card {
+  padding: 18px;
+}
+
+.details-card h3 {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  color: #e2e8f0;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.detail-item label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  display: block;
+}
+
+.detail-item strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.95rem;
+}
+
+.detail-item p {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+/* ─── Coords Card ────────────────────────────────────────────────────────── */
+.coords-card {
+  padding: 14px 18px;
+}
+
+.coords-card label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.coords-card p {
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-family: monospace;
+}
+
+.share-btn {
+  margin-top: auto;
+}
+
+/* ─── Map Container ──────────────────────────────────────────────────────── */
+.map-container {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
 }
 
-.map-header,
-.map-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+#tracking-map {
+  flex: 1;
+  min-height: 500px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0f172a;
 }
 
-#map {
-  min-height: 560px;
-  height: 100%;
-  border-radius: 24px;
-  overflow: hidden;
-  background: #dbeafe;
+.map-legend {
+  display: flex;
+  gap: 18px;
+  padding: 12px 6px 4px;
 }
 
 .legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #d7e3ec;
-  font-size: 0.92rem;
-}
-
-.legend-swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-}
-
-.legend-swatch.ambulance {
-  background: #ef4444;
-}
-
-.legend-swatch.destination {
-  background: #14b8a6;
-}
-
-.legend-swatch.patient {
-  background: #f59e0b;
-}
-
-:deep(.map-badge) {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 3px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.3);
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: white;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #94a3b8;
 }
 
-:deep(.map-badge span) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* ─── Form ───────────────────────────────────────────────────────────────── */
+.form-group {
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.form-input {
   width: 100%;
-  height: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  color: #f8fafc;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
 }
 
-:deep(.map-badge-ambulance) {
-  background: radial-gradient(circle at 30% 30%, #fb7185, #dc2626);
+.form-input:focus {
+  border-color: rgba(45, 212, 191, 0.5);
 }
 
-:deep(.map-badge-destination) {
-  background: radial-gradient(circle at 30% 30%, #5eead4, #0f766e);
+.form-input::placeholder {
+  color: #475569;
 }
 
-:deep(.map-badge-patient) {
-  background: radial-gradient(circle at 30% 30%, #fcd34d, #d97706);
+.form-textarea {
+  resize: vertical;
+  min-height: 70px;
 }
 
-@keyframes pulse-dot {
-  0% {
-    box-shadow: 0 0 0 0 rgba(94, 234, 212, 0.7);
-  }
-
-  70% {
-    box-shadow: 0 0 0 12px rgba(94, 234, 212, 0);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(94, 234, 212, 0);
-  }
+select.form-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
 }
 
-@media (max-width: 1120px) {
-  .layout-grid {
+select.form-input option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.coords-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.gps-status {
+  font-size: 0.82rem;
+  color: #2dd4bf;
+  margin-bottom: 8px;
+}
+
+/* ─── Leaflet fix for dark icons ─────────────────────────────────────────── */
+:deep(.pulse-map-icon) {
+  background: none !important;
+  border: none !important;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .tracking-layout {
     grid-template-columns: 1fr;
   }
 
-  .left-rail {
-    grid-template-rows: auto;
+  .info-panel {
+    order: 2;
   }
 
-  .map-panel {
-    min-height: 720px;
+  .map-container {
+    order: 1;
+    min-height: 400px;
+  }
+
+  #tracking-map {
+    min-height: 350px;
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 480px) {
   .app-shell {
-    padding: 12px;
+    padding: 10px;
   }
 
-  .topbar,
-  .hero-card,
-  .details-card,
-  .patient-action-card,
-  .map-panel {
-    padding: 16px;
-    border-radius: 20px;
-  }
-
-  .topbar,
-  .map-header,
-  .map-footer,
-  .card-header {
+  .topbar {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
   }
 
-  .status-cluster {
-    align-items: flex-start;
+  .phone-card,
+  .emergency-card {
+    padding: 24px 20px;
   }
 
-  .metrics-card {
-    grid-template-columns: 1fr;
+  .metrics-row {
+    flex-direction: column;
   }
 
-  #map {
-    min-height: 420px;
+  .metric-divider {
+    width: 80%;
+    height: 1px;
+  }
+
+  #tracking-map {
+    min-height: 280px;
   }
 }
 </style>

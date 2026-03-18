@@ -9,7 +9,6 @@ import 'package:pulse_ev/features/mission/screens/mission_setup_screen.dart';
 import 'package:pulse_ev/features/mission/models/mission_model.dart';
 import 'package:pulse_ev/features/mission/providers/mission_provider.dart';
 import 'package:pulse_ev/shared/widgets/pulse_map.dart';
-import 'package:pulse_ev/shared/widgets/section_card.dart';
 import 'package:pulse_ev/shared/widgets/status_badge.dart';
 import 'package:pulse_ev/shared/widgets/loading_indicator.dart';
 import 'package:pulse_ev/shared/widgets/error_view.dart';
@@ -133,6 +132,7 @@ class DashboardScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Dispatch notifications now handled by global DispatchOverlay
                         if (hasActiveMission)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 16),
@@ -621,4 +621,3 @@ class DashboardScreen extends ConsumerWidget {
     }
   }
 }
-

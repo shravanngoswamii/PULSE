@@ -1,4 +1,5 @@
 import uuid
+from uuid import uuid4
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
@@ -127,3 +128,21 @@ class Hospital(Base):
     lng = Column(Float, nullable=False)
     address = Column(String, nullable=True)
     phone = Column(String, nullable=True)
+
+
+class EmergencyCall(Base):
+    __tablename__ = "emergency_calls"
+    id = Column(String, primary_key=True, default=lambda: f"EC-{uuid4().hex[:8]}")
+    caller_name = Column(String, default="Unknown")
+    caller_phone = Column(String, nullable=False)
+    caller_lat = Column(Float, nullable=False)
+    caller_lng = Column(Float, nullable=False)
+    incident_type = Column(String, default="Medical Emergency")
+    severity = Column(String, default="high")  # critical, high, standard
+    description = Column(String, default="")
+    status = Column(String, default="pending")  # pending, assigned, in_progress, completed, cancelled
+    assigned_vehicle_id = Column(String, ForeignKey("vehicles.id"), nullable=True)
+    assigned_driver_id = Column(String, ForeignKey("users.id"), nullable=True)
+    assigned_mission_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

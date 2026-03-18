@@ -265,5 +265,44 @@ class AdminStats(BaseModel):
     active_alerts: int
 
 
+# --- Emergency Call ---
+class EmergencyCallCreate(BaseModel):
+    caller_name: str = "Unknown"
+    caller_phone: str
+    caller_lat: float
+    caller_lng: float
+    incident_type: str = "Medical Emergency"
+    severity: str = "high"
+    description: str = ""
+
+class EmergencyCallOut(BaseModel):
+    id: str
+    caller_name: str
+    caller_phone: str
+    caller_lat: float
+    caller_lng: float
+    incident_type: str
+    severity: str
+    description: str
+    status: str
+    assigned_vehicle_id: Optional[str] = None
+    assigned_driver_id: Optional[str] = None
+    assigned_mission_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    # Populated from relationships
+    vehicle_name: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    vehicle_lat: Optional[float] = None
+    vehicle_lng: Optional[float] = None
+    mission_eta: Optional[float] = None
+    mission_distance_km: Optional[float] = None
+    mission_status: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 # Fix forward reference
 TokenResponse.model_rebuild()

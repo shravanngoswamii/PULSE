@@ -2,18 +2,6 @@
 
 PULSE is an intelligent traffic management system that creates green corridors for emergency vehicles using real-time routing algorithms, signal control, and live GPS tracking.
 
-## Architecture
-
-```
-PULSE/
-  Backend/        FastAPI + SQLite backend (routing, auth, APIs)
-  PULSE/          Flutter driver app (emergency vehicle operators)
-  PULSE-CC/       Flutter command center app (traffic police operators)
-  Website/        Vue.js super admin dashboard
-  Algorithms/     Algorithm documentation (A*, Bellman-Ford, Floyd-Warshall)
-  algorithm-demo/ Interactive algorithm visualization
-```
-
 ## Quick Start
 
 ### 1. Backend (FastAPI)
@@ -112,7 +100,7 @@ Login: `operator@pulse.com` / `password123`
 | CC App      | Flutter, Riverpod, GoRouter, flutter_map, Dio  |
 | Admin Web   | Vue 3, Vite, Pinia, Vue Router, Axios          |
 | Maps        | OpenStreetMap (free, no API key required)       |
-| Algorithms  | Dijkstra, A*, Bellman-Ford, SSSP Breakthrough  |
+| Algorithms  | Dijkstra, A*, Bellman-Ford, Floydd Warshall SSSP Breakthrough  |
 
 ## Seed Data (Indore)
 

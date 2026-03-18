@@ -78,6 +78,7 @@ pnpm-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.claude/
 # Always commit the template — never the real secrets
 !.env.example
 
