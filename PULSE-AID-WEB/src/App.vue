@@ -87,10 +87,14 @@ const ambulanceIcon = createIcon('AMB', 'radial-gradient(circle at 30% 30%, #fb7
 const callerIcon = createIcon('YOU', 'radial-gradient(circle at 30% 30%, #5eead4, #0f766e)');
 
 // ── API Calls ──────────────────────────────────────────────────────────────
+const API = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api`
+  : '/api';
+
 async function trackEmergency(phoneNumber) {
   const cleanPhone = phoneNumber.replace(/[\s\-()]/g, '');
   const encoded = encodeURIComponent(cleanPhone);
-  const res = await fetch(`/api/emergency/track/${encoded}`);
+  const res = await fetch(`${API}/emergency/track/${encoded}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || 'No active emergency found for this number');
@@ -99,7 +103,7 @@ async function trackEmergency(phoneNumber) {
 }
 
 async function callEmergency(data) {
-  const res = await fetch('/api/emergency/call', {
+  const res = await fetch(`${API}/emergency/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

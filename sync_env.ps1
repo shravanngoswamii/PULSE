@@ -15,11 +15,18 @@ Get-Content $src | ForEach-Object {
     }
 }
 
-$content = "API_HOST=$($vars['API_HOST'])`nAPI_PORT=$($vars['API_PORT'])`n"
+$lines = @()
+if ($vars['API_BASE_URL']) {
+    $lines += "API_BASE_URL=$($vars['API_BASE_URL'])"
+    Write-Host "  Mode: Cloud (API_BASE_URL=$($vars['API_BASE_URL']))"
+} else {
+    $lines += "API_HOST=$($vars['API_HOST'])"
+    $lines += "API_PORT=$($vars['API_PORT'])"
+    Write-Host "  Mode: LAN (API_HOST=$($vars['API_HOST']):$($vars['API_PORT']))"
+}
+$content = ($lines -join "`n") + "`n"
 
 Set-Content -Path (Join-Path $root "PULSE\.env") -Value $content -NoNewline
 Set-Content -Path (Join-Path $root "PULSE-CC\.env") -Value $content -NoNewline
 
 Write-Host "Synced network.env -> PULSE/.env and PULSE-CC/.env"
-Write-Host "  API_HOST=$($vars['API_HOST'])"
-Write-Host "  API_PORT=$($vars['API_PORT'])"

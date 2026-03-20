@@ -8,6 +8,25 @@ class ApiConstants {
     await dotenv.load(fileName: '.env');
   }
 
+  static String get baseUrl {
+    final fullUrl = dotenv.maybeGet('API_BASE_URL');
+    if (fullUrl != null && fullUrl.isNotEmpty) {
+      final trimmed = fullUrl.endsWith('/') ? fullUrl.substring(0, fullUrl.length - 1) : fullUrl;
+      return '$trimmed/api';
+    }
+    return 'http://$_host:$_port/api';
+  }
+
+  static String get wsUrl {
+    final fullUrl = dotenv.maybeGet('API_BASE_URL');
+    if (fullUrl != null && fullUrl.isNotEmpty) {
+      final trimmed = fullUrl.endsWith('/') ? fullUrl.substring(0, fullUrl.length - 1) : fullUrl;
+      final wsScheme = trimmed.startsWith('https') ? 'wss' : 'ws';
+      return '$wsScheme${trimmed.substring(trimmed.indexOf('://'))}/ws/operator';
+    }
+    return 'ws://$_host:$_port/ws/operator';
+  }
+
   static String get _host {
     final fromEnv = dotenv.maybeGet('API_HOST');
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
@@ -22,10 +41,6 @@ class ApiConstants {
     }
     return 9000;
   }
-
-  static String get baseUrl => 'http://$_host:$_port/api';
-
-  static String get wsUrl => 'ws://$_host:$_port/ws/operator';
 
   static const Duration requestTimeout = Duration(seconds: 30);
   static const Duration wsReconnectDelay = Duration(seconds: 5);

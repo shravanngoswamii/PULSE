@@ -12,18 +12,25 @@ Real-time green corridor system for emergency vehicles using shortest-path algor
 | **Admin-Website** | Web (Vue 3) | Vite, Pinia, Axios | 5173 | Admin dashboard |
 | **PULSE-AID-WEB** | Web (Vue 3) | Vite | 5174 | Public emergency caller portal |
 
-## Network Setup (LAN / Physical Devices)
+## Network Setup
 
-All apps connect to the Backend. A single file controls the IP:
+All apps connect to the Backend. Edit `network.env` once:
 
-**1. Set your PC's LAN IP in `network.env`:**
+**Option A — Cloud (Render, Railway, etc.):**
 
 ```env
-API_HOST=192.168.1.42   # ← your PC's Wi-Fi IPv4 (ipconfig)
+API_BASE_URL=https://your-app.onrender.com
+```
+
+**Option B — Local LAN:**
+
+```env
+# API_BASE_URL=
+API_HOST=192.168.1.42   # your machine's Wi-Fi IPv4
 API_PORT=9000
 ```
 
-**2. Sync to Flutter apps:**
+Then sync to Flutter apps:
 
 ```powershell
 # Windows
@@ -33,18 +40,22 @@ API_PORT=9000
 bash sync_env.sh
 ```
 
-This writes `PULSE/.env` and `PULSE-CC/.env` with the same IP.
+For web apps running locally against a remote backend, create `.env` in each web app directory:
 
-**3. Build APKs and install on phones:**
+```env
+VITE_API_BASE_URL=https://your-app.onrender.com
+```
+
+**Build APKs:**
 
 ```bash
 cd PULSE && flutter build apk --release
 cd PULSE-CC && flutter build apk --release
 ```
 
-APKs are at `build/app/outputs/flutter-apk/app-release.apk`.
+APKs at `build/app/outputs/flutter-apk/app-release.apk`.
 
-**4. Web apps** are already bound to `0.0.0.0`, so phones on the same Wi-Fi can open them at `http://<YOUR_IP>:5173` (Admin) and `http://<YOUR_IP>:5174` (PULSE-AID).
+**Web apps** are bound to `0.0.0.0`. On LAN: `http://<IP>:5173` (Admin), `http://<IP>:5174` (PULSE-AID).
 
 ## Quick Start
 
